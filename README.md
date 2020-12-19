@@ -615,3 +615,570 @@ It is crucial to understand how DWDHT and dDatabase can be used in tandem and ho
 -9. Alice now announces Bob's dDatabase (its dWeb network address) on dWeb's DHT, adding her public IP and port to the swarm now surrounding Bob's dDatabase.
 -10. Jim comes along and learns about Bob's dDatabase and performs a lookup of its network address on dWeb's DHT.
 -11. dWeb's DHT returns a list of peers who are announcing (broadcasting) Bob's dDatabase (now Alice and Bob), from whom Jim can now download the dDatabase. All Jim has to do is form a `request` message, detailing the `index` range he'd like to download.
+
+### dWebTrie
+dWebTrie is an abstraction layer that utilizes [Hash Array Mapped Tries](https://en.wikipedia.org/wiki/hash_array_mapped_trie) in order to provide a general purpose, distributed key/value store over the [dDatabase Protocol](#ddatabase). dWeb is a single writer key/value store which is able to map key/value data to a matching dDatabase index using a builtin rolling hash array mapped trie.
+
+A dWebTrie utilizes the underlying dDatabase's public/private key pair, as well as its dWeb network address, and is represented by this single dDatabase feed. A [dAppDB](https://github.com/distributedweb/dappdb) is a multiwriter distributed key/value store that can be represented by multiple dDatabase feeds and therefore multiple key pairs, although its dWeb network address is derived from the dAppDB's initial dDatabase feed's public key.
+
+dWeb was created as a way of storing an entire file system, with possibly thousands or even millions of files, within a dDatabase, where keys are path-like strings (e.g., /make/the/web/great/again) and values are arbitrary binary blobs. Without the dWeb abstraction, a distributed file system like [dDrive](#ddrive) simply wasn't possible, since there would have been too many complexities and bottlenecks if a protocol like dDrive would have used dDatabase directly. Optionally, we could have built a trie-structured key/value API within a dDrive implementation, but that would have been far too much overhead. It made more sense to develop a separate trie-structured key/value API, layered on dDatabase, so that many other protocols and applications could use dWeb as an off-chain distributed database management system.
+
+#### Database Semantics
+-Keys can be any UTF-8 string (e.g. "maga")
+-If a key uses path segments (like a folder or file location) (e.g., /this/folder) path segments must be separated by the forward slash character ( /). Repeated slashes (//) are not allowed.
+-Leading and trailing (/) are options (e.g., "/hello" and "hello" are equal).
+-A key can be both a path segment and a key at the same time (e.g., /a/b/c and /a/b can both be keys at the same time).
+-Values can be any binary blob, including an empty blob (zero bit length).
+-Acceptable values can be UTF-8 encoded strings, JSON encoded objects, protobuf messages, or a raw uint64 integer (endianness does not matter).
+-Length of value (in bits) is the only form of type or metadata stored about the value.
+-Deserialization and validation are left to library and application developers.
+
+#### dWebTrie Representation
+Below is a pseudo-representation of a dWebTrie database:
+```
+Key                    Value
+= = = = = = = = = = = = = = = = = = = =
+Name                Jared Rice Sr.
+Location            Dallas, TX
+```
+
+While this database is truly logical, since it is actually just a bunch of binary-based blob entries within a dDatabase feed, using dWeb's abstract layer, one could easily execute `get(name)`, which would return `Jared Rice Sr.` This is far simpler than working directly with the dDatabase feed, which would require farm more steps and much more programming overhead.
+
+#### Database API
+A dWebTrie-based database is created by opening an existing dDatabase feed with dWebTrie content or by simply creating a new dDatabase feed.
+
+The following API calls are part of the dWebTrie standard:
+
+##### `put(key, value)`
+Inserts a value of an arbitrary byte size under the specified key. Requires read-write access. Returns an error via callback if there is an issue.
+
+##### `get(key)`
+Retrieves the value for a given key.
+
+##### `delete(key)`
+Retrieves the value for a given key.
+
+##### `list(prefix)`
+Returns a flat (non-nested) list of all keys currently in the database under the given prefix.
+
+##### `batch(batch)`
+Insert/delete multiple values atomically.
+
+##### `watch(prefix)`
+Watch a prefix of the DB (or key) and get notifications when it changes.
+
+#### Overhead and Scaling
+Depending on the size of the database, the metadata overhead can vary.
+
+Consider the case of a two-path-segment key, with an entirely saturated trie and a uint32-sized feed and entry index points:
+
+-`trie:` 4 * 2 * 64 bytes = 512 bytes
+-`total:` 512 bytes
+
+In a light-case, with few trie entries and single-byte varint feed and entry index pointers:
+-`trie:` 2 * 2 * 4 bytes = 16 bytes
+=`total:` 16 bytes
+
+For a database with most keys having `N` path segments, the cost of a `get()` scales with the number of entries `M`, as `O(log(M))` with the best case `1` lookup and the worst case `4 * 32 * N - 128 * N` lookups.
+
+The cost of `put()` or `delete()` is proportional to the cost of `get()`. The cost of `list()` is linear `(O(M))` in the number of matching entries, plus the cost of a single `get()`.
+
+The total metadata overhead for a dWebTrie-based database with `M` entries, scales with the `O(M log(M))`.
+
+#### dWebTrie Schemas
+A dWebTrie-based dDatabase feed consists of a sequence of protobuf-encoded message of `Entry` or `InflatedEntry` type. A "protocol header" header entry should be the first entry in the feed, using "dWebTrie" as the `type`. dWebTrie itself does not specify the content of the optional header extension field, as higher level protocols are left to handle this portion of the protocol.
+
+When data doesn't fit, due to the limited size constraint, for any given value, there is a second `content` feed associated with the dWebTrie key/value feed. The optional `contentFeed` field described in the schema below is used to identify a dWebTrie key/value feed, that needs a second `content` feed.
+
+The sequence of entries includes an incremental index, where the most-recently appended entry in the feed contains metadata pointers that can be followed to efficiently locate any key in the database, without having to perform a linear scan across the database's entire history, or generate an index data structure that's independent of the database itself. Although it is completely up to the implementation on whether they choose to implement their own index or not.
+
+The protobuf message schemas for `Entry` and `InflatedEntry` are:
+```
+message Entry {
+  message InflatedEntry
+  required string key = 1;
+  optional bytes value = 2;
+  optional bool deleted = 3;
+  required bytes trie = 4;
+  repeated uint64 clock = 5;
+  optional uint64 inflate = 6;
+  repeated Feed feeds = 7;
+  optional bytes contentFeed  = 8;
+}
+```
+
+The fields that are common to both message types are:
+-`key` - UTF-8 key that this node describes. All slashes are removed before storing in message.
+-`value` - Byte array of an arbitrary size.
+-`deleted` - Boolean that converts entry into a "dead" entry, if `true`. It is recommended that if `false` to keep this value `undefined`, rather than using `false`. This can also be used to store user-defined metadata related to the deletion.
+-`trie` - A structured array of pointers to other `Entry` entries in the dDatabase feed. This is used for navigating the tree of keys.
+-`inflate` - A reference to the feed index number of the most recent `InflatedEntry` entry in the feed. **NOTE:** This should not be set on a feed's first `InflatedEntry` entry.
+-`contentLog` - For applications that require a parallel `content` dDatabase feed. This filed is used to store the 43-byte public key for that feed. It is sufficient to write a single `InflatedEntry` message in the dDatabase feed, with feeds containing a single entry (a pointer to the current feed itself) and `ContentLog` optionally set to a pointer to a paired content feed. The `Entry` type can be used for all other messages, with `inflate` pointing back to the single `InflatedEntry` message.
+
+#### Key Path Hashing
+Every key path has a fixed-size hash representation that is used by the trie. When all path segments are concatenated, they are combined into what is known as a `path hash array`. Similar in many ways to that of a `hash map data structure`, a `path hash array` can have collisions where one key (string) and another key have the same hash, without suffering any issues because of it. This is because each hash is a reference (pointer) to a linked-list `container` of Entries, which can be linearly iterated over until the sought after value is found.
+
+Each element (segment) in a path equates to 32 values, which also equates to a 64-bit hash. The key `/presidents/trump` has two path segments (presidents and trump) which equates to a 65  element path has array, made up of 32 element hashes and a terminator.
+
+The `SipHash-2-4` hash algorithm is used, along with an 8-byte output and a 16-byte key. The corresponding input is the UTF-8 encoded path string segment, excluding slashes or other separators, as well as any terminators. A 16-byte secret key is required where all zeros is used, for this particular use-case. When an 8-byte outputted hash is converted to an array of 2-bit bytes, the ordering of the hash array is handled byte-by-byte, where for each byte, take the two lowest-value bits as `byte index 0` in the hash array and the next two bits as `byte index 1`, etc. When path hashes are combined into an array of greater length, the left-most path element hash will relation to byte indices `0` to `31`. The terminator, `4`, will have the highest index in the hash array (right-most).
+
+**Note:** dWebTrie derived from a project known as HyperDB and the following examples have been lifted from [DEP-0004[(https://datprotocol.com/deps/0004-hyperdb), which was the original specification/proposal for HyperDB. A special thanks to the incredible work of Mathias Buus, Bryan Newbold and Stephen Whitmore.
+
+-For example, consider the key `/tree/willow`. `tree` has the following hash:
+`[0xAC, 0xDC, 0x05, 0x6C, 0x63, 0x9D, 0x87, 0xCA]`
+
+-This converts into the following array:
+`[0,3,2,2,0,3,1,3,1,1,0,0,0,3,2,1,3,0,2,1,1,3,1,2,3,1,0,2,2,2,0,3]`
+
+-`willow` has a 64-bit hash:
+`[0x72, 0x30, 0x34, 0x39, 0x35, 0xA8, 0x21, 0x44]`
+
+-This converts into the following array:
+`[2,0,3,1,0,0,3,0,0,1,3,0,1,0,3,0,1,1,3,0,0,2,2,2,1,0,2,0,0,1,0,1]`
+
+-These two combine into the unified byte array with 65 elements:
+`[0,3,2,2,0,3,1,3,1,1,0,0,0,3,2,1,3,0,2,1,1,3,1,2,3,1,0,2,2,2,2,0,3,2,0,3,1,0,0,3,0,0,1,3,0,1,2,3,0,1,1,3,0,0,2,2,2,1,0,2,0,0,1,0,1,4]`
+
+In another example, the key `/a/b/c` converts into a 96-byte hash array, i.e., `32 + 32 + 32 + 1`. (1) in this case the terminator bit (4).
+
+##### Incremental Index Trie
+Each individual node stores a prefix trie that can be used to lookup other keys and can also be used to list all keys that are related to a given prefix. The prefix trie is stored in the `trie` field within an `Entry` message, as referenced in [dWebTrie Schema(#dwebtrie-schema).
+
+Simply put, the `trie` is equal to the `path hash array`. As mentioned in the schema, each individual element within a `trie` is referred to as a `container`. Each container that isn't empty, is a pointer to the newest `Entries`, where the path is equal (identical) up to that specific prefix location. This is true, because each `trie` has 4 values at each node, which means there can be a pointer to up to 3 other values at a given element in the trie array. (Containers can be empty, if at that particular node, there are zero `branches`).
+
+**NOTE:** Only non-null elements will be transmitted as stored on disk.
+
+The trie data structure is a sparse array of pointers to other `Entry` entries. Each pointer references a specific feed, which indexes to the same value.
+
+###### Looking Up A Key In A Database
+The process for key lookups, is to:
+-1. Calculate the `path hash array` for the key you are looking for.
+-2. Select the most recent ("latest") `Entry` in the feed.
+-3. Compare `path hash arrays` for exactly matching paths.
+-4. If they match exactly, then compare keys. If keys match, the lookup was successful.
+-5. Check whether the `deleted` flag of the `Entry` schema is set. If so, this entry actually represents the deletion of the `Entry`.
+-6. If the path segments (concatenated) match, look for a pointer in the last `trie array index` and iterate from step #3 with the new `Entry`.
+-7. If the path segments (concatenated) do not match, find the first index in each `path hash array` where both arrays differ and look up the corresponding element in this `Entry's` trie array.
+-8. If the element is empty, or doesn't contain a pointer corresponding to your 2-bit value, then the key does not exist in the dWebTrie.
+-9. If the trie element is not empty, then follow that pointer to select the next `Entry`. Recursively repeat this process from step #3, which will allow you to descend the trie in a search where the search will either terminate in your search or find that the key is not defined in the dWebTrie.
+
+###### Writing A Key To A Database
+In order to write a key to a dWebTrie database, follow the specified process below:
+-1. Calculate the `path hash array` for the key to be stored and start with an empty trie array of the same length; where writing to this trie array will start at the current index of `0`.
+-2. Select the most-recent ("latest") `Entry` in the feed.
+-3. Compare `path hash arrays` for exactly matching paths.
+-4. If they match exactly, then compare keys. If keys match, then you are overwriting the current `Entry` and can copy the `remainder` of its trie up to the current trie index. **NOTE:** When I say "overwriting", the previous `Entry` is not removed, for the simple reason that the dDatabase feed below the dWebTrie is immutable and append-only. A more-recent `Entry` is created with its own schema, which could, for example, set the `deleted` flag to true, which would then flag this `Entry` as deleted for future lookups. This works because in immutable datasets, where the management of state is paramount, we can see the entire lifetime of the data, from the moment it was created to the moment it was deleted. It's also important to note that during the lookup process, by selecting the "most-recent" `Entry`  for a key in the database, we are pulling its most-recent state.
+-5. If the path segments (concatenated) match, but not the keys, then you are adding a new key to an existing `hash container`. Copy the trie array and extend it to the full length and add a pointer at the last index of the array of the same hash as the `Entry`.
+-6. If the path segments (concatenated) do no match, compare both trie arrays and find the differing portion of the array. Copy all of the elements of the trie array, between the `current index` and the `diff index`, into a new trie array. **NOTE:** It doesn't matter whether the located trie array is empty or not.
+-7. In this `Entry's` trie array, look up the corresponding element at the `diff index`. If empty, then the most similar `Entry` has been located.
+-8. Create a pointer to this node, to the trie at the `diff index`, and the write process is finished. **NOTE:** All remaining trie elements will be empty and can be removed.
+-9. If the `diff index` has a pointer, this means it isn't empty. If a pointer exists, follow that pointer to the next `Entry`. Recursively repeat this process from step #3.
+
+**NOTE:** To delete a key/value, follow the same write procedure above and set `deleted` to `true` in the `Entry`. `Deletion nodes` will persist in the database forever.
+
+##### Trie Encoding
+Trie data structures are encoded into a variable length byte string as the `trie` field of an `Entry` message. It's important to reiterate that trie data structures are simply sparse, indexed arrays of pointers to entries.
+
+**NOTE:** The following encoding schema and examples were also lifted from `DEP-0004`; only `buckets` in a dWebTrie are referred to as `containers`.
+
+Consider a trie array with `N` `containers` and `M` non-containers `(O <= M <= N)`. In the encoded trie field, there will be `M` concatenated bytestrings in the following form:
+
+`trie index (varint) | bucket bitfield * (packed in varint) | pointer sets **`
+
+- * - Bitfield encodes which of the 5 values (4 values if the index is not mod 32) at this node of the trie have pointers.
+- ** - Pointer sets each reference an entry at (feed index, entry index), where `feed index` is a varint with an extra "more pointers at this value" low bit, encoded as `feed_index << 1 | more_bit` and where `entry index` is simply a varint.
+
+When dealing with a small/sparse dWebTrie, there will be a small number of non-empty containers; put another way, a small/sparse dWebTrie will have a small `M`. For a very large/dense dWebTrie (millions of key/value pairs), there will be many non-empty containers; put another way, `M` will approach `N` and containers may have up to the full 4 pointer sets.
+
+-Consider an entry with a path hash:
+`[1,1,0,0,3,1,2,3,3,1,1,1,2,2,1,1,1,0,2,3,3,0,1,2,1,1,2,3,0,0,2,1,0,2,1,0,1,1,0,1,0,1,3,1,0,0,2,3,0,1,3,2,0,3,2,0,1,0,3,2,0,2,1,1,4]`
+
+-and the `trie`:
+`[, ]`
+
+In this case, `N = 64` (or you could count as 2, if you ignore trailing empty entries) and `M = 1`.
+
+There will be a single bytestring fragment (chunk):
+
+-`trie index` varint = 1 (second element in trie array).
+-`bitfield` (varint 2) = 0b0010
+-There is only `pointer set` for value `1` (the second value).
+-There is a single pointer in the `pointer set` which is: `feed = 0 << 1 | 0, index = 1` or `(varint 2, varint 1)`.
+-Combined, the `trie bytestring` will be:
+`[0x01, 0x02, 0x02, 0x02]`
+
+For a more complex example, consider the same `path hash array` with the `trie array`:
+`[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,]`
+
+ If we `db.put ('/a/b', '24')`, we expect to see a single `Entry` of the `InflatedEntry` type at `index1` of the underlying dDatabase feed.
+
+For reference, the first 104 bytes in the path match those of  the `/a/b/c` example from earlier, because it shares two of its 3 path segments. Since this is the second entry, the `entry index` is `1`.
+
+**NOTE:** There is a major different between an `entry index` and an `array index`. An `entry index` is a record (new index) added to the dWebTrie's underlying dDatabase, while a specific index within a trie array, is its position from within the array. To make sure that I kill all confusion, consider the below example:
+
+The example of `/a/b` being `put` into the key-value store, if data was in plain English and not binary, would look something like this pseudo-representation, once inside a dDatabase feed:
+
+```
+Index                           Value
+= = = = = = = = = = = = = = = = = = = = = = = = = = =
+1                                 {
+                                     type: dwebtrie,
+                                     key: Entry,
+                                     value: 24,
+                                     deleted: null,
+                                     trie: [0x01, 0x02, 0x02, 0x02],
+                                     ...
+                                   {
+```
+
+The placement (index) with a dDatabase and the placement of an element in the above trie array, are clearly apples and oranges and I did not want there to be any confusion.
+
+Now, if we `db.put('/a/c', 'hello')` and expect a second `Entry` of `Entry` type, the `path hash array` for this key (index 2) is:
+`[1,2,0,1,2,0,2,2,3,0,1,2,1,3,0,3,0,0,2,1,0,2,0,0,2,0,0,3,2,1,1,2,0,1,1,0,1,2,3,2,2,2,0,0,3,1,2,1,3,3,3,3,3,3,0,3,3,2,3,2,3,0,1,0,4]`
+
+The first 32 characters of this path are common with the first `Entry` (they share a common prefix, `/a`). `trie` is defined, but is mostly sparse. The first 32 elements of common prefix match the first `Entry` and then two additional hash elements ([0,1]) happen to match as well. There is not a `diff index`, until `index 34` of the array (zero-indexed). At this entry, there is a reference pointing to the first `Entry`. An additional 29 trailing null entries have been trimmed in the reduced metadata overhead.
+
+Next, we insert a third node with `db.put('/x/y', 'other')`, and get a third `Entry`, where the `path hash array` is (index 3) is:
+`[1,1,0,0,3,1,2,3,3,1,1,1,2,2,1,1,1,0,2,3,3,0,1,2,1,1,2,3,0,0,2,1,0,2,1,0,1,1,0,1,0,1,0,3,1,0,0,2,3,0,1,3,2,0,1,3,2,0,1,0,3,2,0,2,1,1,4]`
+
+Consider the lookup process for `db.get('/a/b')`, which we expect to return `24`, as written in the first `Entry`. First, we calculate the path for the key `a/b`, which will be the same as the first `Entry`. Then we take the "latest" (most-recent) Entry, with entry `index 3`. We compare the `path hash arrays`, starting at the first element, and find the `diff index` at `index 1` of the array `(1 == 1, then 1 ! = 2)`.
+
+We look at `index 1` in the current `Entry's` trie, and find a pointer to the entry at `index 2` of the underlying dDatabase itself, so we fetch the `Entry` and recurse. Comparing `path hash arrays`, we now get all the way to `index 34` of the array before there is a difference (`diff index`). We again look at the trie, find a pointer to the entry at `index 1` of the underlying dDatabase and fetch the first `Entry` and recurse. The path elements of the entry at `index 1` of the feed (dDatabase feed) match exactly and therefore, we have found the entry we are looking for and it has an existing value, so we return the value, which is `24`.
+
+Lastly, consider a lookup for `db.get('/a/z')`. This key does not exist, so we expect dWebTrie to return with `key not found`. We calculate the `hash path array` for this key:
+`[1,2,0,1,2,0,2,2,3,0,1,2,1,3,0,3,0,0,2,1,0,2,0,0,2,0,0,36,2,1,1,2,1,2,3,0,1,0,1,1,1,1,1,2,1,1,1,0,1,0,3,3,2,0,3,3,1,1,0,23,1,0,1,1,2,4]`
+
+Similar to the first lookup, we start with the `entry index` 3, and follow the pointer to `entry index` 2. This time, when we compare `path hash arrays`, the first `diff index` is at `array index` 32. There is not a trie entry at this index, which tells us that the key does not exist in the database.
+
+###### Listing A Prefix
+Continuing on with the current state of the dDatabase below dWebTrie abstraction layer, we call `db.list('/a')`, to list all keys with the prefix `/a`.
+
+We generate a `path hash array` for the key `/a` without the terminating symbol (4):
+`[1,2,0,1,2,0,2,2,3,0,1,2,1,3,0,3,0,0,2,1,0,2,0,0,2,0,0,3,2,1,1,2]`
+
+Using the same process as the `get()` lookup, we find the first `Entry` that entirely matches the prefix, which is `entry index` 2. If we had failed to locate any `Entry` with a complete prefix match, then we would return an empty list of matching keys. If we start with the first prefix-match node, we save that key as a match (unless `deleted` is `true` in the `Entry`). Then, select all trie pointers with a higher index than the length of the prefix and recursively inspect all pointer-to `Entries` and the `Entries` they point to and so on, until a complete list tree is built.
+
+#### The Baseline Foundation For A Distributed File System
+For a server-less web like the dWeb to work, it would have to find a way to not only transfer data between peers, but to transfer entire files and therefore, entire file systems between peers, just as servers do when teamed with the HTTP protocol on a server-to-client basis. Doing this on a peer-to-peer basis, as the dWeb has accomplished, not only requires a protocol for exchanging index abstract data blobs between peers (dDatabase), but another protocol (dWebTrie) layered above this for creating a file system-like logical and persistent database structure, which utilizes a key-value format, so that file-paths (keys) can be appended to a blob, with file data (values) and efficiently traversed by receiving peers performing specific lookups.
+
+This way, an entire file system can be stored within a single file (a single dDatabase feed) and any peer in the world who is able to locate the feed via dWeb's DHT, can then communicate with the peers within dDatabase's swarm, request the dDatabase and subsequently download the dDatabase to their machine and easily consume the data via higher-level abstractions (like dWebTrie, or even higher levels like dDrive's actual file system layer).
+
+dWebTrie was designed to store the data that derives from an entire file system within a dDatabase and allow higher-level abstractions like [dDrive](#ddrive) to consume that data and reproduce the entire file system on a remote peer's device. dWebTrie can traverse millions of records within a dDatabase and relate specific path segments via `list()`, without any bottlenecks. This makes dWebTrie the perfect file system database for a distributed file system, considering it is built on top of a distributed, append-only data feed that can be exchanged between peers in real-time. I can't make the rationale for dWebTrie as a file system for distributed file systems any clearer, other than to say that our current dWebTrie implementation scales with `O(N log(N))`.
+
+###dDrive
+dDrive is a secure, real-time distributed file system abstraction layer on top of dWebTrie, designed for the real-time exchange of file systems on a peer-to-peer basis. When comparing the dWeb to the World Wide Web, one could easily arrive at the conclusion that a dDrive is the equivalent to a server on the World Wide Web for some use-cases, like handling a client's request for a specific file. This is somewhat true, since a dDrive can be discovered on dWeb's DHT and a request can be sent to the peer(s) in its underlying swarm for specific files, or the entire file system for that matter - although the process of doing this on the dWeb is more secure and far more efficient.
+
+**NOTE:** a dDrive cannot replace a server and its ability to act as a backend for both user authentication and remote application execution (currently, at the time of this writing). Web applications within a dDrive can utilize blockchain-based protocol suites like dWeb's [ARISEN](#arisen) to build truly serverless and decentralized applications that do require a backend and/or user authentication.
+
+Just as I noted within my explanation of the dWebTrie, dDrive is also completely logical; in other words, it doesn't technically exist. A dDrive is an abstraction for storing files from a file system as dWebTrie-based `Entries` within a dDatabase and reproducing the actual file system and its files from the same `Entries`.
+
+Consider the following pseudo-representation of how files in a dDrive are logically referenced via a dWebTrie and actually stored within a dDatabase:
+
+-Alice creates a dDrive with her website files:
+```
+index.html
+img/logo.png
+```
+
+-dDrive creates the following key-value entries into its underlying dWebTrie (put):
+```
+Key                              Value
+= = = = = = = = = = = = = = = = = = = = = = = = = =
+/index.html                 <html><head>...
+/img/logo.png             8fe1e4... (image file converted to hexadecimal notation)
+```
+
+-dWebTrie then creates a dDatabase and the following entries:
+```
+Index                           Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = =
+1                                 {
+                                     type: dwebtrie,
+                                     message: Entry,
+                                     key: /index.html,
+                                     value: <byte array of file data>
+                                     deleted: null,
+                                     ...
+                                   }
+
+2                                 {
+                                     type: dwebtrie,
+                                     message: Entry,
+                                     key: /img/logo.png,
+                                     value: <byte array of file data>,
+                                     deleted: null,
+                                     ...
+                                   }
+```
+
+**NOTE:** The first entry in the feed (index 0), as noted in [dWebTrie Schema](#dwebtrie-schema) is a special protocol header entry, which is not shown in the above example in order to keep all pseudo-representations simple.
+
+-dDatabase then encodes both entries in binary notation and stores them in the feed:
+```
+Index                           Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                 01011101101010...
+1                                 00101001110101110...
+2                                 0101101011011001...
+```
+
+#### dWeb Network Address
+Since a dDrive is simply a dDatabase, it uses the dDatabase's public/private keypair and therefore its dWeb network address.
+
+Remember, a dWeb network address is simply a 32 byte hexadecimal hash and in the case of a dDrive, its a 32 byte hexadecimal hash of its underlying dDatabase's public key.
+
+The following is an example of a dWeb network address:
+`40a7f6b6147ae695bcbcff432f684c7bb529lea339c28c1755896cdeb80bd2f9`
+
+#### dDatabase Protocol Headers
+You will recall in [dWebTrie Schema](#dwebtrie-schema) that the first entry in its underlying dDatabase, contains a `protocol header`. Protocol headers at `index 0` are used to decipher what the proceeding entries in the dDatabase are related to.
+
+Below are the fields included in a dDatabase's `protocol header`:
+
+| Field No. | Name | Type | Description |
+| --- | --- | ---- | --- |
+| 1 | Type | Length-prefixed | The type of data in the dDatabase |
+| 2 | Content | Length-prefixed | 32-byte public key of content feed (if type is `ddrive`) |
+
+If the `type` is `dwebtrie`, then we know there is a single dDatabase feed and that the overlaying dWebTrie abstraction layer has formatted the data as a key-value store. If the `type` is `ddrive`, then we know there is a separate `content` feed (as explained in the next section [Content and Metadata Feeds](#content-and-metadata-feeds) ), whose 32-byte public key can be found in the `Content` field of the feed's header.
+
+The `Content` field allows two or more feeds to be coupled together, while the overall `protocol header` is used to distinguish the data set type within an underlying dDatabase. This simple header, as you will see later in this paper, is giving way to the creation of many decentralized technologies, outside of just a decentralized web, like the dWeb.
+
+That brings me to dDrive's coupling of dDatabase feeds.
+
+#### Content and Metadata Feeds
+Contrary to the pseudo-representation that was shown in the previous section, a dDrive doesn't use a single dDatabase, it uses two coupled feeds to represent files and folders. One feed is for metadata and the other represents files and folders. Put another way, one feed is for file metadata and the other feed is for the data related to files. The `metadata` dDatabase feed contains the names, sizes and other metadata for each file, and is typically sparse, even when the overlaying dDrive contains a large amount of files and folders. The `content` dDatabase feed contains the actually file contents and is of the plain "ddatabase" type, instead of the `dwebtrie` or overlaying `dDrive` type.
+
+When a dDrive is created, dWebTrie is initiated and creates two underlying dDatabase feeds. In the protocol header of the `metadata` feed, the `Type` field is sent to `ddrive` and the `Content` field is set to the 32-byte public key of the `content` feed.
+
+When a file is added to a dDrive, a dWebTrie `Inflated Entry` is created for the file metadata in the `metadata` feed and the actual file data is stored as an arbitrary data blob within the `content` feed. If you recall in the [dWebTrie Schema](#dwebtrie-schema), an `Inflated Entry` contains the `contentLog` field, to point to the location in the `content` dDatabase feed for a given dDrive, where the file contents, related to the `metadata` `Inflated Entry`, are located. Put another way, each `metadata` feed array points to where in the `content` feed the file data is located, so you only need to fetch the contents of files you are interested in.
+
+Here is an updated pseudo-representation of a dDrive with a simple `index.html` file, so you can update your mental model of how a dDrive is actually constructed:
+
+-A blank dDrive is created, where dWebTrie initiates the creation of a blank dDatabase for the `content` feed, and a blank dDatabase feed for the `metadata` feed.
+
+-The following `protocol header` is added as the first entry in the `metadata` feed:
+```
+Index                            Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                  {
+                                      Type: dDrive,
+                                      Content: <public-key-of-content-dDatabase>,
+                                    }
+```
+
+-A file called `index.html` is added to the dDrive and the following entries are added to the `content` and `metadata` feeds:
+```
+Metadata Feed:
+--
+Index                            Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                  { // Protocol Header
+                                      Type: ddrive,
+                                      Content: <public-key-of-content-database>
+                                    }
+-- newly added entry:
+1                                  { // Metadata Inflated Entry
+                                      key: /index.html,
+                                      value: metadata-for-file,
+                                      deleted: null,
+                                      trie: <pointers to other files or folders where the path is created> (none in this case),
+                                      contentLog: <index number in content feed, where file data is> (1)
+                                    }
+```
+```
+Content Feed
+--
+Index                            Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                  { // Protocol header
+                                      Type: ddatabase
+                                    }
+
+1                                  010110... (Binary blob of index.html file content)
+```
+
+-In actuality, both dDatabases are truly in binary when it's all said and done:
+
+```
+Content Feed:
+--
+Index                             Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                   010110111...
+1                                   1101110001...
+```
+```
+Metadata Feed:
+--
+Index                             Entry
+= = = = = = = = = = = = = = = = = = = = = = = = = = = =
+0                                   01011101110...
+1                                   10110111011...
+```
+
+There are many reasons the `content` feed doesn't use the dWebTrie abstraction layer/format for appending data, one of which is the limited value constraint of the `value` field in a dWebTrie's `InflatedEntry`. Other reasons include the fact that there is no need for pointers via the `trie array`, since related path segments are sorted via the `metadata` feed where a `trie array`, via each `Inflated Entry's` `trie` field, can be found.
+
+It's actually quite simple to build a tree of files and folders via the `metadata` feed by relating `path segments`. After a tree is calculated, thanks to the location of the `content` feed in the protocol header and the `contentLog` field in each `Inflated Entry`, the contents of a file can easily be located.
+
+#### Metadata Value Field Schema
+In the previous pseudo-representation of how a dDrive is created, you will notice that in the `Inflated Entry`, within the `Metadata` feed of the `index.html` file, the `value` field is where the metadata is located. This field carries its own schema, as follows:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Mode | uint32 (varint) | Unix permissions (setuid or setgia) |
+| 2 | UID | uint32 (varint) | User ID (Unix) |
+| 3 | GID | uint32 (varint) | Group ID (Unix) |
+| 4 | Size | uint64 (varint) | File size in bytes |
+| 5 | Blocks | uint64 (varint) | The number of object blocks |
+| 6 | Offset | uint64 (varint) | Similar to Node's FS module |
+| 7 | ByteOffset | uint64 (varint) | Similar to Node's FS module |
+| 8 | MTIME | uint64 (varint) | Modified time |
+| 9 | CTIME | uint64 (varint) | Created time |
+
+This is packaged within a `protocol Buffers` encoded message and used as the value `field` within a dWebTrie-based `InflatedEntry` message, which is also encoded with `Protocol Buffers` and appended as an entry in the `metadata' feed.
+
+#### Version Controlled
+As mentioned in [dDatabase](#ddatabase), files transferred over `HTTP` are not versioned, which means the historical state of a file or files is not available. `HTTP` is used to transfer a file's or files' current state from the server it/they exist on, to the client they're being requested from. When it comes to the `DWEB` protocol and its underlying protocols, the underlying data is [immutable](#the-case-for-immutability), which means that any rendition of the underlying data's state can be requested and constructed. In the case of a dDrive, each time a file is added to a dDrive or the metadata/content of a file is modified, entries are made to its underlying dDatabase feeds, where each entry represents an instance of the dDrive's state.
+
+Each modification to a dDrive represents a new version of the dDrive. String names can also be assigned to dDrive versions and these can be stored within the drive itself, creating a straightforward way to switch between semantically meaningful versions. Simply put, a dDrive is built on top of append-only logs where old versions of files are preserved by default. You can get a read-only snapshot of a specific version of a dDrive at any time. Additionally, as mentioned above, you can tag versions with string names, making them more parseable.
+
+Tags are stored inside the dDrive's `hidden trie`, meaning they are not enumerable using dDrive's [standard filesystem methods](#standard-filesystem-methods). They will replicate with all other data in the drive, though.
+
+For more information on version control method's, see dDrive's JavaScript implementation and its official documentation [here](https://github.com/distributedweb/ddrive#version-control).
+
+#### Sparse Downloading
+Now that it has been explained how a dDrive's file system is stored and versioned within two coupled dDatabase feeds, it becomes easier to understand how one peer can download a specific version of specific files from a specific dDrive, otherwise referred to as `Sparse Downloading`. Simply put, since all of the layers that overlay a dDatabase feed utilize its underlying [dDatabase Protocol](#ddatabase-protocol) for the request and fulfillment of data between peers, any of these abstraction layers can make a request for a specific index range, for whatever that equates to at a specific abstraction layer. For example, when a specific file or folder is requested at the dDrive layer, it's common for the entire `metadata` feed to be requested from the dDrive's swarm. Once received, the file or folder path is passed to the dWebTrie layer, which searches the `metadata` feed for the matching path. If the current version of the file or folder is wanted, rather than older versions, the `most-recent` `Inflated Entry` that matches the path is chosen. This `Inflated Entry` should contain a `contentLog` pointed to the `index` where the file's data is stored in the `content` feed. From there, a `request` message can be sent to the dDrive's swarm, using an underlying dDatabase Protocol-based duplex stream, where the specific `index` from the `contentLog` can be requested.
+
+For example, if the link `dweb://<dweb-key>/index.html` is requested via a ` DWEB`-ready client, the entire dDrive in this instance is not downloaded; as a matter of fact, only the `index.html` file and any files linked within it are downloaded by the requesting peer.
+
+This is how the process would take place:
+-1. A remote peer requests `dweb://<dweb-key>/index.html` via a DWEB-ready client.
+-2. The client looks up the dWeb key via dWeb's DHT and a list of peers who are announcing this dDrive (its swarm) are returned.
+-3. The client chooses a peer from the returned list and requests to open a dDatabase protocol-based duplex channel on channel 1 with the peer (or even multiple peers).
+-4. The client asks for only the `metadata` feed, once the peers accept the connection request, by sending a `request` message on the channel, requesting the entire `metadata` feed's index range.
+-5. The peer sends a `data` message back over the duplex channel containing the `metadata` feed.
+-6. The client passes the `/index.html` path segment to the dWebTrie abstraction layer, so it can perform a lookup in the `metadata` feed.
+ -6. An `InflatedEntry` is found, with a `contentLog` field within the entry, pointing to `index 6` of the `content` feed.
+-8. The client locates the `content` feed's public key in the `protocol header` of the `metadata` feed and opens another duplex channel on channel 2, with the `content` feed's public key, with the same peers from step #3 and sends a `request` message for `index 6`.
+-9. The `content` feeds is sent in a `data` message to the client, containing **ONLY** `index 6`.
+
+It should be noted, that at step #8, one could request the entire `content` feed, which would eliminate future remote requests, as long as both feeds are replicated live.
+
+#### Drive Nesting
+dDrive has a built-in "mounting" system, which allows one or more dDrive(s) to be mounted or "nested" within a parent dDrive. This allows Bob, to nest Alice's dDrive full of her published photos within his dDrive full of published photos. What is great about this, is that this enables true peer-to-peer collaboration, since when Alice adds a photo to her dDrive of published photos, they are automatically replicated within Bob's dDrive, since Alice's drive is nested within Bob's.
+
+**NOTE:** It's important to note that Alice's dDrive is a totally separate dDrive from Bob's and can be accessed directly. Bob is simply a peer (seeder) of Alice's dDrive and mounts it within one his own dDrives, so that when a peer downloads Bob's dDrive, they also receive the most recent version of Alice's. In truth, this means that a portion of Bob's dDrive is downloaded from his dDrive's swarm and another portion from the swarm of Alice's dDrive.
+
+For more information on dDrive mounting, please see dDrive's reference JavaScript implementation and its [Mounting docs](https://github.com/distributedweb/ddrive#ddrive-mounting).
+
+#### Standard Filesystem Methods
+What one will find is that a dDrive implementation, like our JavaScript implementation, truly mirrors the standard filesystem methods of the Node.js `fs` module. Below is a quick explanation of those methods.
+
+##### `createReadStream`
+Read a file out of the dDrive, as a stream. Similar to `fs.createReadStream`.
+
+##### `readFile`
+Read an entire file into memory. Similar to `fs.readFile`.
+
+##### `createWriteStream`
+Write a file as a stream. Similar to `fs.createWriteStream`.
+
+##### `writeFile`
+Write a file from a single buffer. Similar to `fs.writeFile`.
+
+##### `unlink`
+Unlinks (deletes) a file. Similar to `fs.unlink`.
+
+##### `mkdir`
+Creates a directory. Similar to `fs.mkdir`.
+
+##### `rmdir`
+Deletes an empty directory. Similar to `fs.rmdir`.
+
+##### `readdir`
+Lists a directory. Similar to `fs.readdir`.
+
+##### `stat`
+Stat an entry. Similar to `fs.stat`.
+
+##### `lstat`
+Stat an entry but do not follow symlinks. Similar to `fs.lstat`.
+
+##### `info`
+Get mount information about an entry.
+
+##### `access`
+Similar to `fs.access`.
+
+##### `open`
+Open a file and get a file descriptor back. Similar to `fs.open`.
+
+##### `read`
+Read from a file descriptor into a buffer. Similar to `fs.read`.
+
+##### `write`
+Write from a buffer into a file descriptor. Similar to `fs.write`.
+
+##### `symlink`
+Create a symlink from a link name to a target name.
+
+##### `mount`
+Mounts another dDrive at the specified mountpoint. A mount can be a specific version of a dDrive.
+
+##### `unmount`
+Unmount a previously-mounted dDrive.
+
+#####  `createMountStream`
+Create a stream containing content/metadata feeds for all mounted ddrives.
+
+##### `getAllMounts`
+Returns a `Map` of the content/metadata feeds for all mounted ddrives, keyed by their mountpoints.
+
+##### `close`
+Close a file. Similar to `fs.close`.
+
+##### `version`
+Returns the current version of the drive.
+
+##### `key`
+Returns public key indentifying the drive.
+
+##### `discoveryKey`
+Returns a key derived from the public key (the dweb network address).
+
+##### `writable`
+Returns a boolean indicating whether the drive is writable.
+
+##### `peers`
+Returns a list of peers currently replicating with a dDrive (via dweb's DHT).
+
+##### `checkout`
+Checkout a read-only copy of the dDrive at an old version.
+
+##### `createTag`
+Create a tag that maps to a given version. If a version is not provided, the current version will be used.
+
+##### `getTaggedVersion`
+Returns a version, corresponding to a tag.
+
+##### `deleteTag`
+Delete a tag. If the tag doesn't exist, this will be a no-op.
+
+##### `getAllTags`
+Return a `Map` of all tags.
+
+##### `download`
+Download all files, in path of current version. If no path is specified, this will download all files.
+
+For more detailed documentation, please see dDrive's JavaScript implementation [here](https://github.com/distributedweb/dDrive).
+
+#### Live Replication
+A dDrive can be live-replicated, by keeping two duplex streams open with online peer(s) of a dDrive's swarm, while sending a content `request` message to said peers, for the entire index range of both the `content` and `metadata` feeds. This is easily done via the dDrive layer by simply using the [`replicate`](https://github.com/distributedweb/ddrive#replication). method in a dDrive implementation.
+
+Replication can also take place on a per-file or per-path basis, rather than downloading updates for an entire dDrive's underlying files/paths within its filesystem.
+
+##### dDrive Auditing
+Since a dDrive is technically two dDatabase feeds, the data is easily  audited and validated as to having derived from the holder of the public-private keypair, and the dweb network address that mathematically derived from the public key.
+
+Also, since a dWebTrie and a dDatabase are both single-writer, it's an easily proven fact that only the creator of a dDrive can write to it, preventing outside forces from, for example, manipulating a website's content. It is also easily provable that data within a dDrive has not been altered, since it's an append-only log. For more information on how data within a dDatabase is validated, please read about dDatabase's [Merkle Trees & FIO Trees](#merkle-tree-and-fio-trees).
