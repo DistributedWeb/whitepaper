@@ -1182,3 +1182,227 @@ Replication can also take place on a per-file or per-path basis, rather than dow
 Since a dDrive is technically two dDatabase feeds, the data is easily  audited and validated as to having derived from the holder of the public-private keypair, and the dweb network address that mathematically derived from the public key.
 
 Also, since a dWebTrie and a dDatabase are both single-writer, it's an easily proven fact that only the creator of a dDrive can write to it, preventing outside forces from, for example, manipulating a website's content. It is also easily provable that data within a dDrive has not been altered, since it's an append-only log. For more information on how data within a dDatabase is validated, please read about dDatabase's [Merkle Trees & FIO Trees](#merkle-tree-and-fio-trees).
+
+### ARISEN
+ARISEN is a suite of blockchain protocols, powered via smart contracts, that also acts as a development framework for dWeb-based applications, by providing a distributed virtual machine (global computer), a smart contract engine, a universal authentication layer, decentralized network consensus, decentralized payments, a decentralized domain name system and a decentralized reporting system.
+
+#### On-Chain Vs. Off-Chain Protocols
+While dWeb's DHT (DWDHT), dDatabase (DDB), dWebTrie (DWT) and dDrive (DDRIVE) form dWeb's "off-chain" protocol suite, ARISEN forms the dWeb's "on-chain" protocol suite. It's important to explain the difference between `off-chain` protocols and `on-chain` protocols, other that what is obvious. While blockchain technology is great for many use-cases, as are peer-to-peer networks like the one formed by dWeb's `off-chain` protocol suite, both of these have obvious deficiencies and crystal-clear bottlenecks when either is used independently in the formation of a decentralized web. Although, when both are combined, a decentralized web, with its own distributed and decentralized application development suite, is brought to life. Here were some of the issues we were able to solve through the combination of ARISEN and dWeb's `off-chain protocols`:
+
+-1. Since an application and its files that are distributed to users via a dDrive are completely open source, a distributed database of some sort would have to be distributed in the dDrive so that users of the web application and their actions within the app could be written to this nested database. (**NOTE:** this database would be located within a separate dDrive, which would be nested with the app's dDrive. The database would have to be a multi-writer distributed database, like [dAppDB](https://github.com/distributedweb/dappdb), that allows multiple users to write to the database, since a dAppDB is make up of a constantly growing web of dDatabases, each of which is written to by a unique user (more on this in [Multi-Writer Databases](#multi-writer-databases)). This requires the initial creator of the dAppDB to constantly authorize new keys and therefore introduces a slight bit of centralization, since the dDrive creator would have to approve the authorization from their end; a change that would update the state of the nested dDrive, which would replicate to all of the app's users in real-time as well. This creates an issue where an app's creator could decide which users can use their application, through their ability to choose who they authorize to write to the app's database.
+
+As you will see in subsequent issues within this section, ARISEN easily provides a decentralized, on-chain data persistence layer for applications which CAN allow for the use of off-chain distributed databases, that which the application itself would be unable to control.
+
+-2. Applications have users and need a decentralized user management system of some sort, where users are in control of their authentication details. Centralized applications store user credentials within a centralized database, typically have their own integrated user and user permissions system and therefore control who can and who cannot use their applications. In the world of decentralized applications, a user management system cannot be managed by the app developer, even if it's open and based around public key cryptography, due to the fact an application could still manage to choose who can and cannot use their application. dDrives are controlled by their creator, wile a blockchain provides a decentralized and trusted third party for user authentication. A blockchain protocol suite like ARISEN, that has an onboard smart contract engine, allows an application developer to isolate actions that require user input and therefore user authentication within a smart contract that's stored on ARISEN's blockchain. Actions within a smart contract (i.e., creating a post on a social network) can be executed from the dDrive's application files (outside of the blockchain), where the action is initiated by a blockchain-based account, signed with the private key of the account and broadcasted by the blockchain, where it can be validated by trusted (in the case of ARISEN, elected) members of the blockchain network. Where, if verified, the data that derives from the action is stored in a database that is related to the smart contract on ARISEN. This clearly solves the database issue faced in #1, where multiple users can write to an application's database without the application developer preventing certain users from doing so, since the application developer is not in control of the blockchain, like he is in control of the app's dDrive. The on-chain database could be used to point to off-chain distributed databases that only users are in control of for data storage. This also insures that an application doesn't have to rely solely on a blockchain, instead using it as a pointer to off-chain databases. Beyond ARISEN providing a user management system, it provides `human-readable` usernames and an access-control system (permission system), which applications can easily be designed around.
+
+-3. The dWeb, for it to be used by non-technical users, needs a decentralized domain name system (dDNS), since 64-character hexadecimal addresses are too difficult, if not impossible, to memorize. Centralized domain names would not work for several reasons, one being that the standard DNS system is not designed to work with dWeb addresses and two, as I noted in the [Preface](#preface) of this paper, centralized domains can be seized by tyrannical entities. dWeb's off-chain protocols like DWDHT could be used for a domain name system, but I have determined that actions of domains, like the actions of accounts, need to be cryptographically validated. Also, with DHT, someone would have to control the "issuance" of dTLDs. ARISEN allows for the creation of premium accounts that can be won via auction, which can be used to create a sub-account that contains a period (.). For example, the account "dcom" can be won, and used to create a subaccount like "website.dcom", which resembles a domain and has its own permission-levels and associated keypairs, since it can authenticate with ARISEN (like any other account). The won name clearly acts as a dTLD and auctions clearly decentralize the issuance. A smart contract can then be developed for creating dDNS records for a domain, where the domain itself has to sign for the creation of a record. For example, this contract would have an `add` action that accepts the following parameters:
+-`domain` (account used for validation)
+-`record_name`
+-`ttl`
+-`class`
+-`type`
+-`rdata` (dWeb Network Address)
+
+Like I mentioned in #2, each action would require an account (in this case a domain) to sign for the action. Once signed and validated, the above record would be stored in a database on ARISEN, logically associated with the contract and the domains as well, so that record lookups via ARISEN's API can be unique to a domain - more on this in [On-Chain Data Persistence])#on-chain-data-persistence).
+
+-4. Then comes the issue of payments. Since applications on the dWeb are distributed openly within a dDrive, integrating centralized forms of payment simply isn't possible, since the integration with these types of systems would reveal API keys (secret keys) used to integrate and authenticate with these services (e.g., PayPal). This forces applications to utilize decentralized forms of payments via networks like ARISEN (RIX), Bitcoin (BTC), EOS (EOS) and others. Obviously, the dWeb is blockchain agnostic when it comes to application development, but the dWeb protocol, as explained in (DWEB)(#dweb), bridges both the off-chain and on-chain protocols discussed in this paper, for reasons discussed later. While off-chain currencies like CloudCoin could certainly be integrated, there are still questions regarding the centralization of the DNS servers CloudCoin uses as a way of validating the authenticity of CloudCoins; although, this doesn't create an issue where the apps developers or an outside entity can seize CloudCoins. Technically, anyone could launch their own validation system and, since CloudCoin is distributed within image files, there is no ledger or transaction history, introducing anonymity, which might be avoided by some developers.
+
+While a similar system like CloudCoin could be developed using dWeb's DHT, we have not embarked on such a project but we certainly will in the future.
+
+-5. The downsides of a decentralized web with no checks in place would allow for the illegal distribution of narcotics and child pornography. I will certainly mention terrorist activity, but I won't over-emphasize since it is consistently over-exaggerated by various government entities to circumvent the Bill of Rights and discourage the use of certain privacy-enabling technologies. If the dWeb only consisted of off-chain protocols, the dWeb would act as a Torrent network for websites and web applications and would certainly be a free-for-all for criminals. Again, ARISEN's blockchain protocol became the solution to this issue, through its builtin election/voting system and 21-member elected governance, which has the power through a 15/21 majority vote to reverse transactions (actions). Since dWeb network addresses are registered on ARISEN (see [DWEB Protocol](#DWEB) and domains, as well as dDNS records are controlled and stored on ARISEN (see [dDNS](#ddns)), the governance could halt the activity taking place on specific dWeb network addresses and domains, further protecting the network and dWeb's users from illegal and nefarious activity.
+
+It became important, in our eyes, to create a reporting system using an ARISEN smart contract and integrate it with other contracts, like `dWeb` and `arisen.wrap`, so that community members could report illegal activity and vote on its submissions to the governance for a `removal vote`. This gave way to the creation of dWeb's ratified [Constitution](#constitution), which governance members must abide by in the removal of illegal content. The Constitution protects free speech and many other human rights.
+
+dWeb's off-chain protocols are incapable of providing this sort of solution, since it requires all of the solutions explained in #1 through #4.
+
+It was essential that I started off the ARISEN section explaining why a blockchain protocol suite was needed, along with the differenced between `on-chain protocols` and `off-chain protocols`. `On-chain protocols` provide a decentralized and trusted network that help bring to life the necessary facilities needed to allow for the development of web applications that provide end-to-end decentralization for their users, while also placing checks on the content that is distributed between peers via `off-chain protocols`. This bridge between both protocol types is what forms what we call the `dWeb`, hence the reason why we named the protocol that bridges the `off-chain` and `on-chain` networks the [DWEB Protocol](#dweb).
+
+The sub-sections that follow explain the ins-and-outs of ARISEN and its underlying protocols, algorithms and features.
+
+**NOTE:** If it is your view that #1 through #5 introduced too much too quickly, it is my view that many developers discourage the inclusion of blockchain in to many projects. I felt like it was appropriate to explain first, why the dWeb combined with `on-chain` and `off-chain` protocols and second, why `off-chain` protocols were incapable of accomplishing what `on-chain` protocols can with exceptional simplicity and efficiency. If any of the previous section confused you, due to a lack of understanding of a `singleton computer` like ARISEN, all of what was explained in these sections is thoroughly detailed in subsequent sections.
+
+#### The Global Computer
+ARISEN can be described as a global computer, in other words, it's much more than just a blockchain. You can think of a block as a bunch of protocols that form decentralized information exchange platforms. From a computer science perspective, ARISEN is a deterministic but practically unbounded state machine, consisting of a globally accessible singleton state, along with a globally distributed virtual machine (see [RSN VM](#rsn-vm)) which is designed to programmatically apply changes to ARISEN's overall state.
+
+From a practical perspective, you could think of ARISEN as a massive, multiwriter dDatabase that forms a ledger that is written to by a trusted and elected network of computers that have the capability of executing application code which is ultimately stored within the ledger itself and subsequently used to update the ledger (the ARISEN state). This ledger is referred to as a "blockchain" in scientific terminology and is used to synchronize and store the system's state changes. A cryptocurrency known as RISE (RIX) is used to meter and charge for the cost of storing computed data on the ledger, to insure that ARISEN's global computer resources cannot be abused by bad actors.
+
+#### Turing Completeness
+The term "Turing Completeness" refers to the father of computer science, Alan Turing. When working with ARISEN, you will be lucky if you don't stumble across the terms "Turing Completeness" or "Turing Complete." In 1936, Turing created a mathematical model of a state machine that manipulated symbols by reading and writing them on sequential memory (meant to resemble an infinite-length paper tape). With this construct, Turing would then release a mathematical foundation to answer questions about universal computability; meaning, all problems are solvable. Turing ultimately proved that there are classes of problems that are incomputable.
+
+In this model, Turing specifically provided the "halting problem," whether it was possible, given an arbitrary program and its inputs, to determine whether the program will ever stop running, is not solvable. Turing further defined a system to be "Turing Complete" if it can be used to simulate any Turing Machine. Such a system is called a "Universal Turing Machine" (UTM). ARISEN's ability to execute a stored program (smart contract) in a state machine (ARISEN's global computer), while reading and writing data to memory (ledger), makes it a Turing Complete system and therefore a UTM. ARISEN can compute algorithms that can be computed by an Turing Machine, given the limitations of finite memory.
+
+Turing proved that you cannot predict whether a program will terminate by simulating it on a computer. In other words, we cannot predict what the true outcome of a program will be without running it. Turing Complete systems can run in infinite loops or in simpler terms, without a termination point. They say it's trivial to develop a program that runs in a loop that never ends (which I disagree with), but intended never-ending loops can arise without warning, due to the complex interactions between the starting conditions and the code. ARISEN cannot predict if a smart contract will terminate or how long it will run without actually running it. This means that smart contracts can be designed to purposely run forever, after a node attempts to validate them, so that they consume all of ARISEN's available network resources.
+
+To attack this issue, `Singleton Computers` (such as Ethereum) introduced the `gas` metering mechanism, whereas the ARISEN network uses the `NET`, `CPU` and `RAM` metering mechanisms, discussed further in [Distributing Computing Resources](#distributed-computing-resources). ARISEN can account for every instruction (computation, data access). In order to execute contract-based transactions on the network, a user is required to have `NET`, `CPU` and `RAM` resources, so that infinitely-looping contracts can eventually be halted. `NET`, `CPU` and `RAM` can be acquired through the `staking` of RIX on the network.
+
+#### Smart Contract Engine
+When it is said that ARISEN is also a smart contract engine, it must be pointed out that much of ARISEN, like any other computer - distributed or not - gains its functionality from an underlying set of programs that are stored within it. I like to say that Bitcoin is also a distributed computer like ARISEN, but Bitcoin is limited to a single program that centers around the minting and validated transacting of Bitcoins. The entire state of the Bitcoin computer contains a current historical record of every transaction that has ever occurred from the moment it was started. ARISEN is capable of running an infinite number of programs (smart contracts) which can be compiled and published into ARISEN's memory (ledger). All of the functionality of Bitcoin (minting and validated transacting) of Bitcoins, is combined into a single program on ARISEN known as `arisen.token`, the only difference being that `arisen.token` allows the minting and issuance of an infinite number of currency types, while Bitcoin is limited to a single coin.
+
+Aside from the minting and validation of various token-types, it is important to note that all of ARISEN's core system features store all smart contracts that were used to boot up ARISEN and maintain its complex methods of constant operation. In the sub-sections that follow, I will explain the purpose of each of these core programs.
+
+##### `arisen.bios`
+-The `arisen.bios` contract is a minimalistic system contract that simply supplies the actions that are absolutely critical in the bootstrapping of an arisen-based blockchain.
+-Introduces the data structure of ARISEN's [Block Header](#block-header), weighted permissions, weighted keys, blockchain authorities and The ABI (application binary interface) hash structure.
+-Enables the following actions:
+--Account creation using [Human-Readable Names](#human-readable-names).
+--Update permissions and associated keys for a specific account.
+--Delete account permissions.
+--Assign specific actions from a specified contract to a specific account permission.
+--Publish a smart contract on the ledger.
+--Sets the ABI for a contract, identified by account name.
+--Cancel a deferred transaction.
+--Sent error notification when an error occurs while executing a deferred transaction.
+--Set privileged status for an account.
+--Set resource limits of an account (RAM, NET and CPU).
+--Set a new list of active block producers, by proposing a schedule change.
+--Set blockchain's parameters.
+--Check if an account has authorization to access a current action.
+--Activate a protocol feature.
+--Assert whether a protocol feature was activated.
+
+##### `arisen.system`
+-This account defines the structure and actions needed for an ARISEN-based blockchain's core functionality. Some of the BIOS functionality can be found here, since the system contract largely takes over for the BIOS contract, after the chain has been bootstrapped.
+-Introduces the constants for blocks per day, minimum amount of RAM to activate block production, annual rate of inflation (for native currency), the inflation pay factor, producer pay (percentage of inflation) and the time delay for refunds.
+-Introduces the data structure for name bids, bid refunds, bids, global blockchain parameters, product details, voter info, delegated bandwidth and refund request.
+-Enables the following actions:
+--Init actions for initializing the system contract for a specific version and a symbol.
+--`On Block` action for paying producers and calculating the missed block of other producers.
+--Set RAM limits for an account.
+--Set NET limits for an account.
+--Set CPU limits for an account.
+--Activate a protocol feature.
+--Delegate bandwidth (NET) or CPU.
+--Undelegate bandwidth.
+--Buy RAM.
+--Sell RAM.
+--Refund pending, unstaked RIX after delegation period.
+--Register block producer.
+--Unregister block producer.
+--Set RAM supply.
+--Set RAM rate.
+--Vote for a block producer.
+--Register voting proxy.
+--Set blockchain parameters.
+--Claim block production rewards.
+--Set privilege status for an account.
+--Create name bid (auction).
+--Bid name refund.
+
+##### `arisen.token`
+-The `arisen.token` contract defines the structure and actions that allow users to create, issue and manage cryptocurrencies on ARISEN-based blockchains.
+-Introduces the data structure for account balances and currency statistics.
+-Enables the following actions:
+--Create a cryptocurrency.
+--Issue a specific amount of coins.
+--Transfer a cryptocurrency from one account to another.
+--Get supply of a cryptocurrency.
+--Get the balance of an account (for a specified cryptocurrency).
+
+##### `arisen.wrap`
+-Allows elected block producers to change an account (and domain's) keys, modify a contract, an account's owner and reverse any transaction, through the execution of an action that bypasses regular authorization checks. This can only be successfully executed by a majority (15/21) of the 21 elected block producers.
+
+#### The Blockchain
+It is the programs, aka smart contracts, that when executed, output data which is packaged into transactions, subsequently packaged into blocks and ultimately validated by nodes that are controlled by the network's elected block producers. This section will attempt to explain ARISEN's built-in blockchain from block headers and the block production, to the consensus algorithms used to validate blocks, while still meeting ARISEN's rigorous performance requirements.
+
+##### An Example Smart Contract
+
+```c++
+#include <arisen/arisen.hpp>
+
+using namespace arisen;
+
+class [[arisen::contract]] hello : public contract {
+  public:
+    using contract::contract;
+
+    [[arisen::action]]
+    void hi(name user) {
+      require_auth(user);
+      print("Hello, ", name{user});
+    }
+};
+```
+
+The execution of the above `hi` action is quite simple to understand. One would simply provide the `hi` action with a `user` of the `name` type (an ARISEN account). As long as the `user` can sign the action with a key that matches one of the public keys associated with their stored account on ARISEN, this action will output "hi, name" with the name of the executing user, will generate a transaction, and will eventually be validated within a block. As discussed in the previous section, ARISEN's core functionality is handled most by the `arisen.bios` and `arisen.system` contracts. As the computer runs, regardless of whether users are interacting with it or not, blocks are being produced by ARISEN's 21 block producers, every half second, in an attempt to capture the blockchain's state on a per half second basis.
+
+What is not shown in the smart contract is how data is saved to ARISEN using contract-supplied data structure(s). Contracts can supply specific data structures and can initiate the creation of a database on ARISEN where the data that derives from the execution of an action is ultimately stored. For example, when executing the `newacct` action within the `arisen.system` contract, a valid account name and two public keys are submitted, and if accepted as valid, are stored in the `accounts` table. Other actions within other contracts can now lookup users via the `accounts` table and validate the digital signature accompanying the execution of actions, to see if it derived from the user executing the action.
+
+Simply put, everything that happens on ARISEN, whether it's the creation of an account, a vote for a block producer, or even the uploading/activation of a new smart contract, these actions are handled by various smart contracts that are stored within ARISEN's low-level block-based database structure according to their own data structure and logical database names. As confusing as that may sound, a smart contract does indeed enable the uploading and activation of other smart contracts that can be created by anyone on the network to extend the capabilities of the ARISEN computer itself. Just like an account or a vote for a block producer, newly updated contracts have their own data structure and are stored in their own database as well.
+
+Before any action or its outputted data can be stored in their specified formats, the data must be validated as having derived from the specified user, and is then packaged in a transaction and transmitted by the executing user to the network. A block producer then confirms this data, places it in a block and then cryptographically verifies the legitimacy of the block. Once a block has been validated, it is then stored in the blockchain. For ARISEN, the blockchain represents a gigantic database of transactions but if you dive a little deeper, each of these transactions represents a data entry that derived from a contract formatted in a specific data structure, each of which are intended to be organized in a sub-database with other entry types. This creates what amounts to a massive distributed database management system, with an infinite number of possible data collections, all of which derive their data from the executions of programs which are stored in that very same system.
+
+Actions, in most instances, depend on data that derived from a past execution of the same action or a different action. Take the `hi` action for example. The `hi` action requires the `user` parameter, which is an account. Accounts only exist on ARISEN, because they can be created via the `enact` actions in the `arisen.system` contract. When created, they use the `accounts` structure and are stored in the `accounts` database. The `hi` action uses another action from the `arisen.system` contract called `require_auth()`, which performs a lookup on the `accounts` table and authenticates a given user. All rocket science aside, one could make the argument that ARISEN is a dumb robot and only knows what a given action (or actions) allows it to know. Every single action builds upon the data that derives from other actions. As developers add programs to ARISEN, there are more actions and more data to manipulate. Like a [dDatabse](#ddatabase)), all of this data is immutable, unless of course a block producer majority chooses to remove specific portions of it.
+
+##### The Block Header
+The blockchain is a synchronized collection of blocks, each of which consist of a collection of transactions, with each transaction consisting of a collection of actions, from the period of time a block was produced. Each block has the following header:
+
+| Field No. | Type | Description |
+| --- | --- | --- |
+| timestamp | uint32_t | Block timestamp of when block was produced |
+| producer | name | Name of producer who validated block |
+| confirmed | uint16_t | The amount of block confirmations |
+| previous | checksum256 | Link to the previous block |
+| transaction_mroot | checksum 256 | Link to the transaction's Merkle root |
+| action_mroot | checksum 256 | Link to the action's Merkle root |
+| scheduled_version | uint32_t | A schedule version |
+| new_producers | producer_schedule | Producer's schedule |
+
+Like any other blockchain, the block header allows one block to to be linked to another, whereas within the block, a Merkle Tree is created of all transactions, another is created of all actions, and the block pointer (block hash) is a hash of the block header. Like with a dDatabase, the Merkle Tree hashes for both actions and transactions within an ARISEN-based block efficiently summarize and verify the integrity of the transactions and actions that derive them. The `new_producers` field sets the elected producers and their schedule for the next block. Since ARISEN's election is conducted on a per-minute basis, and blocks are produced every 0.5 second, the producer roll and the producer schedule can change often. Either way, the ARISEN software, and therefore the producers themselves, follow the producer schedule on the previous block for the current block. In any blockchain, synchronization and scheduling is key, which brings me to consensus.
+
+##### Consensus
+ARISEN is based around the Delegated Proof of Stake (DPOS) algorithm, which dictates who is allowed to validate blocks on the network and who receives the delegated authority to make governance-based decisions on behalf of the network. DPOS, when compared to other consensus algorithms, is by far the best choice when it comes to meeting the performance requirements of a completely decentralized web.
+
+A few facts about ARISEN'S rendition of DPOS algorithm:
+-Those who hold RIX coins may elect "block producers" (governance members) through a "continuous approval voting system."
+-Any member (account) on ARISEN can become a "block producer" candidate and can gain the vested power of a governance member, as long as they're in the top 21 candidates.
+-ARISEN's blockchain produces blocks every 0.5 second and only one block producer has the authority to produce a single block.
+-If a particular block is not produced at a scheduled time, then the block for that time slot is skipped.
+-When one or more blocks are skipped, there is a 0.5 second or more gap in the blockchain.
+-Blocks on ARISEN are produced in rounds of 126 (6 blocks each, multiplied by 21 block producers).
+-21 block producers are chosen through the votes casted by members of the network at the start of each round.
+-The 21 selected block producers are then scheduled to verify blocks within that specific round, in an order agreed to by 15 of the 21 block producers.
+-If a particular block producer "misses" a block, or has not produced a block within the previous 24 hour period, they are removed from the governance and must inform the blockchain that they're ready to be a candidate once again. The performance and reliability of the blockchain depends on the perfected network operations, where only provably reliable blocker producers are in position to keep the network running properly.
+-Block producers do not compete for blocks, rather they work collectively to validate a round of blocks. Typically, this keeps the blockchain from experiencing forks.
+-If the blockchain does experience a fork, the algorithm automatically switches to the "longest chain." In other words, the longest chain relates to the chain with the most blocks, which means it has produced the most blocks, which also means it has a higher percentage of block producers who prefer that particular chain and have ultimately reached consensus around it. This works because a fork of ARISEN with more block producers will be longer than other forks and will grow in length much faster, due to it missing fewer blocks.
+-Block producers caught producing blocks on two forks at the same time will likely be voted out, which can be backed by cryptographic evidence as well.
+
+###### Byzantine Fault Tolerance (BFT)
+BFT stands for Byzantine Fault Tolerance, which prevents a block producer from signing two blocks with the same timestamp or the same block height. With BFT, once 15 block producers have signed a block, that block is deemed irreversible. Any block producer under this model could in fact produce two blocks with the same timestamp or block height, but will create cryptographic evidence of their "treason." By using B FT, an irreversible consensus is typically reached within 1 second.
+
+###### Transaction Confirmation
+DPOS blockchains like ARISEN, typically have 100% block producer participation. Within a quarter of a second, transactions are considered confirmed 99.99% of the time. All EOS.IO-based blockchains like ARISEN, have the added luxury of utilizing an aBFT (asynchronous Byzantine Fault Tolerance) for faster achievement of irreversibility. The aBFT algorithm provides 100% irreversibility within a single second.
+
+###### Transaction as Proof of Stake (TaPOS)
+ARISEN requires every transaction to include part of the hash of a recent block header. This hash servers two purposes:
+-1. Prevents a replay of a transaction on forks that do not include the reference block.
+-2. Signals the network that a particular user and their stake are on a specific fork.
+
+Over time, all users end up directly confirming the blockchain which makes it difficult to forge counterfeit chains, as the counterfeit chains would not be able to migrate transactions from the legitimate chain.
+
+#### Accounts, Authentication and User Permissions
+In previous sections, I explained how ARISEN's account and user management systems were formed via the actions and data structures within the `arisen.system` contract. Without accounts, no other action within ARISEN contracts, including those within the system contract, would function since they all require account-based authentication. With that in mind, accounts and ARISEN's authentication protocols are single-handedly the most important feature because without them, nothing you're reading in this paper would be possible.
+
+A few facts about accounts:
+-Accounts on ARISEN, unlike many other blockchains, are unique "human-readable names" that must be 12 characters in length.
+-Users choose their username when creating an account.
+-A new account can only be created by an existing account, due to the fact that any action-generated data stored on ARISEN requires a certain amount of RAM to be staked by the user initiating the action. RAM is like disk storage on ARISEN and is needed to write to the blockchain's memory database for any action that results in stored data in memory, including the create account (newacct) action.
+-This gives way to account creation services that charge a service fee, or ones that simply sponsor account creation, like [PeepsID](https://signup.peepsid.com).
+
+When it comes to decentralized applications, application developers will pay a small cost for account creation to signup a new users but the cost is nominal when compared to the costs needed to acquire new users via advertising or free services, etc. The greatest feature in relation to this model is that once a user has created an an arisen-integrated dApp, that same account can be used to log in to other arisen-integrated dApps. This means that only one app covers the cost and therefore application developers don't have to pay for the creation of every account of their users.
+
+Names less than 12 characters are considered premium names and must be won at auction.
+
+A few facts about premium names:
+-Can be any number of characters (a-z, A-Z, 0-5).
+-Must be won at auction. Any user can start an auction for a name and must be the highest bidder after 72 hours.
+-Once won, other accounts can be created as sub accounts of the premium name, which must include a period (.). For example: `jared.rice`, in this case `rice` is the premium name.
+
+##### Public Key Cryptography & ECDSA
+While cryptography has been around for ages and public key cryptography since the 1960s, its use in blockchains has revolutionized how users are able to authenticate with blockchain-integrated web apps. The blockchain acts as a `Public Key Authority`, where any account's public key can be openly found on the blockchain itself, by anyone in the general public. This way, a user can `sign` anything (e.g., an action transaction) and the blockchain (or anyone for that matter) using `Elliptical Curve Digital Signature Algorithm` (ECDSA) can decipher that the owner of the private key, related to to the public key, was the creator of the digital signature.
+
+ARISEN accounts, when created, require two permission levels, both of which have unique public keys associated with them. These permission levels are known as `owner` and `active`. Actions within ARISEN contracts each require the executing user to authenticate themselves using a specific permission level; in other words, the action must be signed with the private key that was used to derive the public key associated with the permission level selected for action-based authentication.
+
+A few facts about arisen keypairs:
+-Public keys start with the `RSN` prefix.
+-Private keys are seeded with 128 random bits.
+-Private keys start with the number `5`.
