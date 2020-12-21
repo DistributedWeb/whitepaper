@@ -1406,3 +1406,262 @@ A few facts about arisen keypairs:
 -Public keys start with the `RSN` prefix.
 -Private keys are seeded with 128 random bits.
 -Private keys start with the number `5`.
+
+##### Role-Based Permissions Management
+ARISEN uses a "role-based permissions management" system to determine if account-based actions are authorized. ARISEN's software provides a "declarative permissions management system" that gives accounts high-level control over who can do what and when. It is critical that authentication and permission management be standardized and separated from the business logic of an application, which enables the development of tools that manage permissions, generally, while also giving way to a significant boost in performance. An account can be controlled by multiple other accounts at once. Each one of these "controlling accounts" can have different weighted permissions, so that accounts have "multi-user control."
+
+Every account can be controlled by any weighted combination of other accounts and private keys. This ultimately forms a hierarchical authority structure that reflects how permissions are organized and makes multi-user control easier than ever. Multi-user control is the single biggest contributor to security and when used properly, can greatly reduce the risk of theft due to hacking. ARISEN allows accounts to decide which keys and other accounts are allowed to send a particular action type to another account. For example, it's possible to have one key for a user's social media account and another for access to a ride sharing account. You could also give one account the ability to act on behalf of another account, without assigning a single key.
+
+##### Vanity Permission Levels
+ARISEN accounts are capable of creating "vanity permissions levels" whose origins are that of higher-level vanity permissions. Each vanity permission, or VPL, must define an "authority." Authorities of ARISEN are essentially "multi-signature threshold checks" that are comprised of keys and/or VPLs of other ARISEN accounts. For example, as ARISEN account could have a VPL known as "friend" that could be correlated to a specific "Action" on the account, and could be mutually controlled by any of the account's friends. The Steem blockchain (home of the Steemit social network) has three hard-coded VPLs known as `owner`, `active` and `posting, where the `active` VPL can do anything but change the `owner` permission's key, which is the most powerful authority on the account and the `posting` permission can only perform social actions like voting and posting. ARISEN allows accounts to create their own custom-named (vanity) permission levels, by allowing account holders to define their own hierarchy of permissions, as well as a customized group of actions.
+
+##### Permission Mapping
+With ARISEN, each account is able to outline a specific "mapping" between a contract/action or contract of any other ARISEN account and their own VPL. A user, using a social media app, could "Map" his/her social media app to the "friend" VPL. This would allow his/her friends to post on behalf of this user to his/her social media page. While the friend's post still appears as the account holder, they would still be identified by their keys that were used to sign the "Action," therefore you could easily identify users who are abusing their permissions.
+
+##### Evaluating Permission Levels
+If a VPL is used, which doesn't exist, the "active" DPL is automatically used to authorize an "Action." Once a mapping is determined, the signing authority is validated using the threshold multi-signature process as well as the authority associated with the VPL. If this is unsuccessful, it traverses up to the `active` DPL and ultimately the `owner` permission.
+
+##### Parallel Evaluation of Permissions
+The process behind the permission evaluation process is immutable, where transactions based around the change of permissions are not completed until the end of a block, so that all key/permission evaluations for every transaction can be completed in parallel. The quick validation of permissions is possible without costly contract executions that would ultimately be rolled back, and transaction permissions can be evaluated as pending transactions are received so they don't need to be re-evaluated when they're confirmed. Parallelizing the permissions process, while making it "read-only," dramatically increased performance on the network, because of the significant percentage of computation that is required to validate permission-based actions. To add to this, when "replaying" the blockchain from a log of actions, the permissions do not need to be reevaluated. This also significantly lowers the computational load brought by the replaying of a constantly growing blockchain.
+
+##### Stolen Key Recovery
+ARISEN allows users to restore control of their account when their keys are stolen. An account owner can use the stolen `owner` key along with approval of a designated `account recovery partner`. It is important to note, that the account recovery pattern cannot reset control of the account without the help of the user that possesses the `owner` key for the stolen account. Even if a hacker went through this process, it would be pointless due to the fact they they already control the account; although, even if the hacker did go through this process, the `account recovery partner` would probably demand some sort of multi-factor authentication; that is, if the account recovery partner is a dApp itself. A recovery partner has no authority over day-to-day transactions; rather, the recovery partner is only a "party" to the recovery process. This will ultimately reduce legal liabilities, costs, and lost currency that would otherwise be unrecoverable on blockchains that lack this feature.
+
+#### Universal Authentication Layer & Transport
+While public key cryptography is by far one of the most secure forms of authentication in the world, the process of securely managing one's private keys can be cumbersome and can introduce many security risks. As was mentioned in [Role-Based Permission Management](##role-based-permission-management), ARISEN gives way to the development of tools for the management of accounts and permissions, and if developed correctly, can greatly simplify the management of private keys and greatly reduce, if not eliminate, the security threats surrounding the management of private keys. Although, this is only half the problem.
+
+dWeb-based apps that are integrated with ARISEN would require their user to copy and paste a 64-character private key when logging in, and each and every time they execute a specific action within an application (e.g., the `post` action within a social networking app). Just so one can build a mental model surrounding how this process works on the dWeb, try to follow the following description:
+
+-1. A developer writes a simple application that allows someone to post a message to the page. The app itself is written in JavaScript and HTML and utilizes ARISEN's [JavaScript Library](https://github.com/arisenio/arisenjsv1) for executing contract-based actions via ARISEN's API.
+
+-2. The developer writes a simple smart contract called "postit" with a `post` action, that requires an ARISEN account to authenticate using their `active` permission when submitting the action's `message` parameters. The developer deploys the "postit" contract to ARISEN and publishes his app files in a dDrive and announces on the dWeb.
+
+-3. There is a "Post" button in the application, that when clicked brings up a popup that asks for the account username, the `active` private key and the message being posted. When the "send" button is pushed, the app then packages the `post` action with the entered message, along with a digital signature created with the entered private key, and transmits this action to ARISEN so that the `post` action can be executed.
+
+-4. Once executed and validated, it is stored on ARISEN, where the app can now retrieve this data and display on the page.
+
+This is a horrible user experience, even though the user was using a secure account/permission management software, the eventual exposing of the private key in the browser eliminated all of the security advantages provided by the management of software in the first place. This problem was solved by authentication apps like MetaMask and Scatter, which apps can use to communicate with the Ethereum and EOS blockchains. Using MetaMask and Scatter, the process goes like this:
+
+-1. Instead of a "Post" button, there is a "Login" button. Bob clicks the "Login" button and the MetaMask app comes up, where Bob is asked to choose an account (and permission level) and enter a password.
+
+-2. Bob is brought back to the app where he now see a "Post" button.
+
+-3. Bob clicks "Post" and a popup appears with only a "Message" box.
+
+-4. Bob enters the message and clicks "Send."
+
+-5. The app then packages the `post` action with the entered message and the "logged-in" user via step 1 (note: there isn't an actual session, the app simply remembers which account/permission was chosen), along with the corresponding permission to MetaMask.
+
+-6. The MetaMask app pops up, showing the packaged action and which user/permission is packaged with the action as the executor.
+
+7. Once Bob clicks "Execute," Bob enters a password (for MetaMask) and MetaMask signs the action with the private key matching Bob's chosen account/permission level and the transaction is sent to ARISEN for confirmation and eventual inclusion into a future block.
+
+**NOTE:** Authenticators like MetaMask use a password to encrypt the private keys it stores, so that when a user wishes to sign an action, or complete a transaction for that matter, the private key is decrypted with the entered password, used to sign the transaction and MetaMask subsequently removes the decrypted key from the temporary memory or off-line storage. The password is never saved.
+
+This definitely made the process far more secure since Bob's private key was never revealed, but the user experience went from 4 very unsecure steps to 7 very secure steps and requires way too many back and forth interactions with the authenticator application (MetaMask). It was a major reason for the creation of ARISEN's Authentication Transport Protocol and what we refer to as the "Universal Authentication Layer."
+
+##### Simplifying Authentication & Authenticators
+As was seen in the previous section, there are many authenticator apps, each of which use their own protocol for transporting action data between apps and the authenticator itself. A simplified transport protocol would eliminate many steps in the authentication process, while also making the authentication process with decentralized applications even simpler than the authentication process with centralized web applications. The authenticator discussed in the previous section was for other blockchains, but hopefully helped expose the issues most decentralized applications face when it comes to user experience. The following sub-sections will discuss how various ARISEN protocols, tools and features have helped simplify the authentication process for dWeb-based applications.
+
+###### Human-Readable Names
+Unlike most blockchains that use 64-character (or more) hexadecimal addresses for "account addresses," ARISEN associates a username that is `human-readable` with a set of permissions, each of which is associated with a unique public key.
+
+The use of `human-readable` usernames - rather than computer-generated hexadecimal or byte-formatted addresses - means that we're able to further simplify the authentication onboarding, and app-to-authenticator / authenticator-to-app request and response transport lifecycle, and the overall authentication transport process.
+
+###### Universal Authentication Layer
+The goal of ARISEN's `Universal Authentication Layer` is to bring to life a universal means for authenticating users, by standardizing the transport between dWeb-based applications and ARISEN-integrated authenticators via a universal bridge, which makes the authentication process between authenticators seem identical, regardless of how the underlying authenticator is designed. Put another way, it provides a UI layer for giving users a consistent UI/UX flow, independent of the authenticator they are using or the website they're on.
+
+The Universal Authentication Layer brings to life support for Biometric Hardware Secured Keys (e.g., Apple Secure Enclave), and a way for insuring a user is completely aware of the app they're using, as well as the related smart contract they're executing an action within.
+
+The Universal Authentication Layer involves the following components:
+-[Chain Manifest Specification](#chain-manifest-specification)
+-[Ricardian Specification](#ricardian-specification)
+-[Authentication Transport Protocol](#authentication-transport-protocol)
+-[Universal Authentication Library](#universal-authentication-library)
+
+###### Chain Manifest Specification
+An `off-chain manifest`, or manifests, is metadata about an application that is displayed in the root of a [dDrive](#ddrive) (e.g., dweb://<dweb-key>/chain_manifest.json). The location of these files, along with their checkout hash, is referenced in the smart contract that is utilized by the app in what is referred to as an `on-chain manifest`.
+
+Both `off-chain manifest` files are contained in the `chain_manifests.json` and `app-metadata.json` files within the root of a dDrive. The `app-metadata.json` file contains the following fields:
+
+-`spec_version` - The specification version of the `chain manifest`.
+-`name` - The full name of the application. This will be user-facing in app listings, history, etc.
+-`shortname` - A shorter name for the application.
+-`scope` - An absolute path relative to the application's root. (`/` or `/app`, but not `../`).
+- `apphome` - Tells the browser where your application should start when it is launched. This must fall within the `scope`.
+-`icon` - An HTTPS url, DWEB url or absolute path relative to the application's root, followed by a SHA-256 checksum hash. May be displayed in app listings, history, favorites, etc. (.e.g, `dweb://dsocial.dcom/icon.png#SHA256HASH` or `/icon.png#SHA256HASH`, but not `../icon.png#SHA256HASH`).
+-`appIdentifiers` (optional) - For native applications, an array of whitelisted app identifiers (e.g., bundled identifiers for iOS apps or package names for Android apps).
+-`description` (optional) - A paragraph about your application. May be displayed in app listings, etc.
+-`sslfingerprint` (optional) - Your app domain's SSL SHA-256 fingerprint as a hex string. If present, the user agent may check that the SSL fingerprint of the domain submitting the transaction matches that in the provided manifest.
+-`chains` - An array containing the `chainID`, `chainName` and `icon` for any ARISEN chain for which your application's smart contract is located on and therefore, where your application plans to require signing. User agents (like an authenticator) will use this for presenting a friendly chain name and icon to the user when prompted for signing.
+
+An `on-chain manifest` must then be registered using the [arisen.assert::add.manifest](https://github.com/ARISENIO/arisen.assert) action on every ARISEN chain where smart contracts for an app exist and on which an app will transact. Furthermore, an array of `chain manifests` must be declared in a publicly available JSON file at the root of the application's `declaredDomain`. See [Authentication Transport](#authentication-transport-protocol) for the `declaredDomain` parameter, which must match the domain referenced in the `off-chain manifest`.
+
+The `chain-manifests.json` file has the following fields:
+-`account` - The chain account name. This is the account that published this `on-chain manifest`.
+-`domain` - The uri or bundle identifier.
+-`appmeta` - The DWEB or HTTP address of the application's metadata JSON file and its hash. Must be an absolute path.
+-`whitelist` - An array containing the `contract` and `action` for each allowed contract action(s) that your app can propose.
+--The `contract` and/or `action` fields within the `whitelist` on the manifest may contain a wildcard. Wildcards are denoted by " " (empty string).
+
+For a more detailed description of Chain Manifests, please read the full specification [here](https://github.com/ARISENIO/manifest-spec).
+
+###### Ricardian Specification
+The Ricardian Specification gives a set of human-readable requirements (that a smart contract should follow in order to be considered valid) and easily consumable metadata about the actions a contract contains (action title, description and a URL of an icon that describes an action; for example, a pencil icon for the `post` action described earlier in this section). Ricardian Metadata is written in HTML (in .html file(s) separate from the contract code itself) and combined with the contract code in a WASM compiled output format by ARISEN's smart contract compiler. Once deployed to an ARISEN blockchain, it can easily be viewed in an ABI (application binary interface) format (similar to JSON).
+
+For a deeper drive into ARISEN's Ricardian Specification, please refer to the latest version of the spec [here](https://github.com/ARISENIO/ricardian-spec).
+
+###### Authentication Transport Protocol
+ARISEN Authentication Transport Protocol (AATP) provides a protocol that ARISEN-based authenticators, like [dWebID](#dwebid), can utilize to respond to requests from dWeb-based apps, with consistent handling logic in a request-response lifecycle. It aims to improve the user's overall experience and security when authenticating and signing actions that derive from dWeb-based websites and apps.
+
+Below is an explanation of how an authenticator like [dWebID](#dwebid) uses AATP, Chain Manifests and Ricardian-compliant contracts in the process of authenticating a user.
+
+###### `Request Transports`
+A dWeb application can use either a dWebID Link, dWeb Link, Apple Universal Link or a Deep Link to invoke an authenticator application, including the transaction payload in the query string as a hex-encoded value, and the recipient public key, if the payload is encrypted.
+
+-`dwebid://request?payload={hexPayload}&Key={publicKey}`
+-`{customProtocol}://request?payload={hexPayload}&Key={publicKey}`
+-`dweb://{siteUrl}/auth?payload={hexPayload}&Key={publicKey}`
+-`https://{siteUrl}/auth?payload={hexPayload}&Key={publicKey}`
+
+###### `Response Transports`
+Authenticator applications will return a response to the request's `returnUrl` with the payload appended as a hex-encoded URL hash fragment identifier. If the payload is encrypted, the public key is provided at the end, preceded by `-`.
+
+-`dweb://{siteUrl}/some-resource/resource-id#{hexPayload}-{publicKey}`
+-`https://{siteUrl}/some-resource/resource-id#{hexPayload}-{publicKey}`
+-`{customProtocol}://transaction-response#{hexPayload}-{publicKey}`
+
+###### `Request Envelope`
+The top-level properties of each request payload make up the `request envelope`. Envelopes may contain several keys:
+
+-`version` (required) - The protocol version.
+
+-`id` (required) - The unique UUIDv4 of the request, which insures that the requesting application is able to connect a response to the initial request.
+
+-`declaredDomain` (required) - Integrating applications (both web and native) must self-report a `declaredDomain`. Authenticator applications should not blindly trust this URL.
+
+-`returnURL` (required) - The URL to which the authenticator application will return the user after the request has been processed and the user had taken any necessary action.
+
+-`responseKey` (optional) - An elliptic curve 65 byte public key. If provided, the response will be encrypted with this key using the agreed upon algorithm.
+
+-`request` (required) - The request payload, consisting of one or more request types.
+
+###### `Request/Response Types & Authenticator Behavior`
+There are four different types of request, each of which have different payloads. Those requests, the behavior of an authenticator app and each response type are explained below:
+
+-`Transport Authorization Response` - This request must include the preferred response transport (e.g., dWeb Link, Custom Protocol, etc.) as well as an array of contracts and their associated actions involved in the request.
+
+This request type carries out two functions:
+--1. It negotiates and establishes communication with an authenticator application over one or more transports.
+--2. It requests user authorization for the transaction actions that may be requested through each transport. The idea here is that integrating applications or users may restrict which actions are authorized over less secure transports.
+
+**This is an example Request/Response lifecycle for a `Transport Authorization Request`:**
+-1. The request must include a prioritized list of app-supported response transports and a list of requested action permissions for each response transport, which must be white-listed in the `on-chain manifest`. The request may be sent with one or more `Selective Disclosure` or `Authentication` request types.
+-2. Upon the authenticator app receiving the request, it will prompt a user for approval if this is the first time encountering this `Transport Authorization Request` for the given `chain manifest`. The authenticator may respond automatically if the user has previously approved an identical `Transport Authorization Request` for the given `chain manifest`.
+-3. A `Transport Authorization Response` sent from the authenticator app back to an application must include a prioritized list of vault-supported request transports and vault-supported response transports, and MAY be sent through one of the app-supported response transports.
+
+-`Authentication Request` - This request type allows an integrated dWeb-based application to request proof of a user's possession of one or more private keys corresponding to any public keys that they have disclosed. This enabled passwordless authentication flows so that integrating applications can display private data to the authenticated user.
+
+-`Selective Disclosure Request` - Allows an app to request private user data (e.g., availableKeys, authorizers).
+
+**This is an example Request/Response lifecycle for a `Selective Disclosure Request`:**
+-1. The request must include one or more requested attributes (e.g., availableKeys).
+-2. The authenticator app must prompt the user to approve any disclosures they have not previously approved for an identical `Selective Disclosure Request`. It may respond automatically if the user has previously approved an identical `Selective Disclosure Request` for the `chainmanifest` `scope`.
+
+-`Transport Request` - Allows a dWeb-based application to request a user signature for a transaction. In this case, the authenticator application must:
+-1. REJECT the transaction request automatically if the transaction contains any actions not whitelisted in the app's `chainmanifest` for a given ARISEN chain.
+-2. REJECT the transaction request automatically if the transaction contains any actions that have not been allowed by a previous `Transport Authorization Request` for the given transport.
+-3. PROMPT the user for permission to sign if the transaction contains any actions that have not been allowed by a previous Action Permission Request, without autosign privileges. This prompt may be ignored and a `Transaction Request` may be approved automatically if the transaction contains only actions that have been allowed by a previous `Action Permission Request` with autosign privileges.
+
+##### The ARISEN Authentication Process
+Below is a description of the simplified authentication process for dWeb-based apps that utilize an AATP-ready authenticator:
+
+-1. Bob opens the post app again at `dweb://postit.dcom` in his mobile Safari browser.
+-2. Bob downloads dWebID, an AATP-ready authenticator for iOS.
+-3. The PostIt app asks Bob to create an account. He chooses a username and his `owner` and `active` keys are automatically imported into [dWebID](#dwebid) using its builtin import API, and both keys are securely stored on the device's `Secure Enclave` chip.
+-4. Bob sees a "Login" button and clicks it. Upon clicking the login button, a `Transport Request`, along with a `Selective Disclosure Request` is sent to the dWebID mobile application using the `dwebid://` protocol.
+-5. dWebID opens and performs the following checks immediately in the background:
+--assert that the `referrerUrl` and `reuturnUrl` are all paths of the `declaredDomain`.
+--fetches the `chain-manifests.json` file from the root of the `declaredDomain`.
+--asserts that the values for `domain` declared therein all match one another and the `declaredDomain`.
+--fetches the `app-metadata.json` from the `appMeta` URL in the `chain-manifests.json` file and asserts that the file's hash matches the hash declared in both manifests.
+--asserts that the file's hash matches the hash declared in the `on-chain manifest`.
+-6.  If all checks pass, dWebID shows a screen that takes on the following format:
+
+```
+Allow <appnames> to log in
+using dWebID?
+
+<app-icon>
+
+Domain Requesting:
+<app-url> (request URL)
+
+<Deny Button> <Allow Button>
+```
+The above data is retrieved from the `chain-manifests.json` and `app-metadata.json` chain manifest files in the root of the app's dDrive.
+
+-7. dWebID asks Bob which account he would like to disclose with PostIt. Bob selects the @bob account and dWebID sends a `Selective Disclosure Request` with the public key for @bob back to PostIt.
+-8. Bob is returned back to the PostIt app in Safari, where he now sees a "Post" button.
+-9. Bob clicks "Post," which brings up a popup where he can type a message.
+-10. Upon clicking "send," the `post` action related to PostIt app's smart contract on ARISEN is packaged in a `Transaction Request` and sent to dWebID.
+-11. The dWebID is opened automatically and a `Transaction Approval Request` screen is shown that takes on the following format:
+```
+<app icon> <app domain>
+                 <app url>
+--
+<action item> <action name>
+<action description>
+<action contract>
+
+Signing as <username> on <chain name>
+--
+<Cancel Button> <Approve Button>
+```
+The above app icon, app domain and app url derive from the website's `chain-manifests.json` and the `app-manifests.json` file with the app's dDrive, while the action icon, action name, action description and action contract clause derive from the Ricardian metadata stored with the app's smart contract on a specified ARISEN chain.
+
+-12. Bob clicks "Allow" and is prompted for biometric confirmation (face or fingerprint).
+-13. Once Bob is biometrically authenticated, the transaction is signed with the keys from the Secure Enclave.
+-14. The transaction and signatures will be returned to the requesting app, which may, in turn, broadcast the transaction to the chain (NOTE: dWebID broadcasts by default).
+-15. Bob is returned to the PostIt app, which can now retrieve Bob's post remotely from the `postit` database on ARISEN and displays the posted message to Bob.
+
+In the future, any time Bob accesses the PostIt app and initiates the `post` action, Bob is only asked to verify himself biometrically. Bob's entire experience with PostIt is now passwordless and extremely secure.
+
+Keep in mind, Bob probably has no idea he's using a blockchain, nor does he ever see his cryptographic keys. All he ever sees are user-friendly, human-readable prompts and is only prompted twice. Once when he first logs into the app and second, the first time he initiates an action. He is only prompted again when an action is initiated and a `Transaction Request` is sent and he needs to verify his biometrics. ARISEN's Universal Authentication Layer allows dWeb-based apps to simplify their authentication process with ARISEN and allows everyday users of the Internet to experience the power of decentralized apps for the first time.
+
+##### dWebID
+At PeepsLabs, we're developing the dWeb's first authenticator using AATP which can be used as a means for decentralized and universal authentication on the dWeb.
+
+dWebID has the following features:
+-Enables seamless, multi-network support. In fact, the app itself does not even communicate with chains or nodes directly.
+-Securely stores private keys and employs the use of biometrics to sign transactions.
+-Displays richly formatted Ricardian Contracts, which provide users with a human-readable explanation of the actions the app is proposing and allows users to approve or reject the terms of the contract(s).
+-By following the `Manifest Specification`, it displays metadata about the requesting application to end users any time they are prompted to trust an app or sign a transaction from one. This provides users with an improved sense of trust in the requesting application and the signing ceremony itself. It also runs pre-flight security checks, comparing the contents of a transaction request with what integrating apps have declared about themselves.
+
+#### Smart Contracts & RSN VM
+In previous sections, I described out how Smart Contracts power the entire ARISEN computer, but it is the computer itself I have yet to explain. Blockchain-based programs must be compiled, validated and computed; and are entirely dependent upon single-threaded performance, fast compilation and validation of assembly code, as well as the low-overhead calls to native bytecode. ARISEN contracts are for the most part, written in C++, a low-level programming language also known as a systems programming language, whose most pervasive uses are deep in the infrastructure [STRO13]. The language's focus on static types and compile-time type checking help give way to the secure execution of programs (contracts) and help to eliminate the threat of stack overflow attacks, discussed subsequently. ARISEN ships with its own compilers, like [ARISEN CDT](https://github.com/arisenio/arisen.cdt), which compile C++-based contracts into the WebAssembly (WASM) assembly language, a programming language that is one step away from machine language (bytecode), allowing each instruction to be translated into one machine instruction by an assembler [STALL16].
+
+RSN VM, a fork of EOS VM, is a high performance WASM engine with predictable compile times, where contracts do no have to be compiled every time the process restarts. Unlike more popular WASM engines, RSN VM is designed from the ground up for the rigorous demands of blockchain applications, which require far more from a WASM engine than those that were designed for web browsers or standards development.
+
+When it comes to smart contracts, it's a blockchain's lifeline to insure that any non-deterministic behavior, unbounded computations or unbounded use of RAM be prevented, as it can bring down an entire blockchain in seconds. As discussed in [Turing Completeness](#turing-completeness) and [Distributed Computing Resources](#distributed-computing-resources), RSN VM uses a builtin metering mechanism to avoid some of these issues, but at even lower-levels, other issues remain.
+
+The RSN VM has no physical existence. It is a distributed and virtual computation engine, and is not hugely dissimilar to the virtual machines of Microsoft's .NET framework, or interpreters of other bytecode-compiled programming languages such as Java. RSN VM, at a basic level, is in charge of both smart contract deployment and smart contract execution. At a high-level, it is essentially a global, decentralized computer, containing millions of executable objects, each of which utilizes its own data store. Furthermore, RSN VM, in one way or another, is a Turing-complete state machine because every single execution process is limited to a certain amount of computations and completely dependent on the CPU, NET and RAM that's available to the user who is initiating the execution.
+
+RSN VM was designed with the goal of creating a highly deterministic and secure environment for the parallel execution of contracts. Given what derives from the execution of a contract must be deterministic - and the non-deterministic nature of denomals, NaNs and rounding modes as it relates to floating-point arithmetic, in addition to the underlying physical computer's ALU - RSN VM relies on the `softfloat` implementation of IEEE-754 float-point arithmetic, which is even further constrained to insure determinism. To add to that, secondary limits and constraints such as stack size and call depth can cause consensus failures if they differ from a previous backend, which is solved through RSN VM's user-definable constraints at either compiler-time or run-time. User-definable constraints are defined based on use-case and the data-type involved.
+
+While deterministic execution is crucial, time-bounded execution is just as important when it comes to a blockchain-based computer, in order to insure that the deterministic execution of a contract doesn't "over run" the CPU time that is allotted for a given contract. Since blockchains are limited in resources, an `instruction counter`, at a very minimum, is needed to insure the time-bounded execution of a contract. RSN VM allows users to use a simple instruction counter for counter-based time-bounding in a single-threaded environment, but can be avoided by using a `watchdog timer` that doesn't introduce any performance overhead like the latter option.
+
+Even more important is the secure execution of contracts. RSN VM was designed to avoid unbounded memory allocation, extremely long load times, and stack overflows deriving from a syntax analysis (like recursive descent parsing or execution), thanks to a type system that was prebuilt from the onset to insure RSN VM's foundational data types were invariant (exact type matching, where `T = T`). This insures developers don't have to worry about explicit type checks and validations since RSN VM's underlying type system insures that each data type maintains these invariants and kills the execution of a contract that violates this integrated invariance. Given the problems that can occur in C++ with unsafe arrays and pointer references, there have been a number of proposals to augment compilers to automatically insert range checks on such references [STALL18].
+
+RSN VM has special purpose allocators that utilize the security of the physical CPU and the underlying operating system that RSN VM exists upon, to insure that a contract is not able to store data beyond the limits of a fixed-size buffer or attempt to overwrite adjacent memory locations that may hold other variables, parameters or control flow data from the contract itself, which could contain return addresses and pointers to previous stack frames. Buffer overflow attacks are one of the most dangerous and popular forms of security attacks and a guard paging mechanism, via the CoreOS, is used so that memory is properly sandboxed.
+
+There is never a point where, during either the parsing or evaluation phases, RSN VM uses unbounded recursion or loops. RSN VM is constrained to limit or eliminate the ability for a bad or corrupt contract to cause a crash or infinitely hang the machine. It's custom allocators and memory management facilities allow for different access patterns and allocation requirements. RSN VM's allocators are used to back the core data types (fast vector, WASM stack, fast variant and WASM module) and, as such, do not "own" the memory that they use for operations. This gives way to maximizing the performance of the interpreter implementation.
+
+These non-owning data structures allow for the ability to use the memory cleanly, while not having to concern the data type with destructing when going out of scope, which creates a performance increase for portions of RSN VM, without loss of generality for the developer. Since the data is held by these allocators and has lifetimes that match that of a WASM module, no copies of these heavy weight data types are ever needed. Once an element in an RSN VM is constructed, that is its home and final resting place for the lifetime of the WASM module.
+
+##### Contract Storage & On-Chain Databases
+As you may recall, a smart contract itself (`arisen.system`) and its `set` action are used to deploy other contracts to the network and subsequently store the WASM-derived bytecode in an on-chain database associated with the uploading user. The contract itself has its own database associated with it, where the data that derives from the execution of its actions is stored. Although, each account on ARISEN has its own private on-chain database associated with it, for which contracts can optionally choose to store action-derived data via a contract-specific scope.
+
+On-chain databases associated with accounts can only be accessed by its own action handlers. Action handlers are scripts that send actions form one account to another. ARISEN is able to define smart contracts through the combination of action handlers and automated action handlers. Each account can ultimately send structured actions to other accounts and may define scripts to handle actions when they're received. To support parallel execution, each ARISEN account can also define any number of scopes within their database. The block producer will schedule transactions in such a way that there is no conflict over memory access to scope and therefore can be executed in parallel.
+
+As an example, dWeb's [dDNS](#ddns) contract stores domain records within a scope named `ddnsrecords` within each domain's on-chain private database (considering domains in the context of ARISEN are actually accounts), so that records serve as a unique, searchable index for each domain.
