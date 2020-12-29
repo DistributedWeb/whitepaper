@@ -2022,3 +2022,927 @@ Therefore, the following data mode is used in the exchange of data between peers
 -Hash trees eliminate the need for downloaders to verify a specific fragment without having to download the entire Merkle tree.
 -Each time the dDatabase creator appends data (adds a new fragment), a new root hash is calculated and signed with the creator's private key.
 -A remote peer who is downloading an entire feed or a specific fragment can use the creator's public key to verify the signature, which, as a result, verifies the integrity of other fragments and hashes.
+
+#### Hashes And Signatures
+The following types of hashes are found within a dDatabase's Merkle tree:
+-`Fragment hashes` - Hashes the contents of a single fragment.
+-`Parent hashes` - Hash of two fragments, forming a tree structure.
+-`Root hashes` - Hash of all other parent hashes, signed by the dDatabase creator using the dDatabase's private key.
+
+### Peer Data Exchange
+The peer exchange process is actually quite simple to understand when you view one peer as a downloader and the other as an uploader, who are negotiating what fragments they `Want` and `Have`. In some cases, one peer is downloading and the other is uploading. In other cases, both peers are uploading and downloading at the same time as they both only have a portion of the feed (certain fragments). This is because neither peer, in the process of exchanging that feed, are the creators of the feed or the possessors of the feed. Every connection differs from the next, which is why peers must tell each other what they want and what they have.
+
+#### Identifying Data
+Each peer in the data exchange process remembers which fragments the other wants or has. The `Want` message is used by a downloader to inform the other peer of the fragment range (index range) they want to download and, as a result, want the other peer to inform them of whether or not they have it. The `Have` message is used by an uploader to indicate to the downloader that they do indeed have what the downloader seeks and will send if asked to.
+
+As peers download or delete data, the list of fragments that have and want will change. This state is communicated to the other peer using four message types:
+-`want`
+-`unwant`
+-`have`
+-`unhave`
+(see [Peer Message Structure](#peer-messaging-structure))
+
+Each of these message types consist of the following structure in the their `Message Body`:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Start | Varint | Number of the first fragment you want/unwant/have/unhave. |
+| 2 | Length | Varint | 1 = Just the start fragment; 2 = The start fragment and the next one and so on. |
+
+If the `Length` field isn't included, this signals to the other peer that the entire feed is wanted, including new fragments, as they're appended.
+
+##### Bitfield Field
+If an uploader has many small, non-contiguous ranges of data, it can take a large amount of `Have` messages to communicate what the uploader actually has with the downloader.
+
+A new `Have` message can be used that represents contiguous and non-contiguous ranges of data quite efficiently, using the following `Message Body` structure:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Start | Varint | ... |
+| 2 | Length | Varint | ... |
+| 3 | Bitfield | Length-prefixed | A sequence of contiguous and non-contiguous fragment ranges. |
+
+Fragments can be divided into ranges, where each range is either contiguous (all fragments are there or none are there) or non-contiguous (some fragments are present). Each fragment range must be 8 fragments long. Range types, in some cases, alternate but it's possible for contiguous ranges to be included in a series of ranges within feeds where all fragments are present.
+
+###### Range Encoding Structure
+These ranges are encoded as follows within the `BitField` field of the `Have` `Message Body`:
+
+| No. | Name | Description |
+| 1 | Contiguous | A single varint containing sub-fields that represents how many 8-fragment sections there are and whether all are present. |
+| 2 | Non-Contiguous | Varint saying how many 8-fragment sections the bitfield represents, followed by bitfield. |
+
+The first byte of the bitfield represents the first 8-fragment section. The most significant bit of each byte represents the first fragment of each 8-fragment section.
+
+#### Requesting Data
+Once an uploader has signaled that they have the data you want, you can send a `Request` message to ask them for it. A `Request` `Message Body` has the following structure:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Index | Varint | Number of the fragment to send back. |
+| 2 | Bytes | Varint | If included, ignore the `Index` field and send the fragment containing this byte. |
+| 3 | Hash | Varint | 0 = Send fragments and hashes; 1 = Just send fragments, no hashes. |
+| 4 | Nodes | Varint | 0 = Send back all hashes to verify this fragment; 1 = Just send fragments, no hashes. |
+
+**NOTE:** A `Request` can only be used to request a single fragment.
+
+##### Cancelling A Request
+If a fragment is no longer needed, a `Cancel` message can be sent. The `Cancel` `Message Body` has the following structure:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Index | Varint | Number of a fragment to cancel. |
+| 2 | Bytes | Varint | Ignore the `Index` field and cancel the fragment request that contains this byte. |
+| 3 | Hash | Varint | Set to the same value as the hash field of the request you want to cancel. |
+
+#### Sending Data
+When an uploader receives a `Request`, they can fulfill the `Request` by sending a `Data` message to the downloader. The `Data` `Message Body` has the following structure:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Index | Varint | Fragment number. |
+| 2 | Value | Length-prefixed | Contents of fragment. |
+| 3 | Nodes | Length-prefixed | This field is repeated for each hash the requestor needs. |
+
+The `Nodes` field uses the following recursive structure:
+
+| Field No. | Name | Type | Description |
+| --- | --- | --- | --- |
+| 1 | Index | Varint | Hash number. |
+| 2 | Hash | Length-prefixed | 32-byte fragment hash of parent hash. |
+| 3 | Size | Varint | Total length of data in fragments that hash covers. |
+| 4 | Signature | Length-prefixed | 64-byte ed25519 signature of roothash corresponding to fragment hash. |
+
+### An Example DWEB Communication
+-PeerA looks up dWeb network address on the DHT and finds that PeerB is swarming.
+-PeerA pulls PeerB's address and port number and initiates a TCP connection.
+-PeerA sends a `Feed` message to PeerB as follows:
+```
+-Length (in bytes)
+-Channel/Type:
+--Channel: 0
+--Type: 0
+-Message body:
+--dWeb network address (Field1)
+--nonce (Field2)
+```
+-PeerA then sends a `Handshake` message to PeerB as follows:
+```
+-Length
+-Channel/Type:
+--Channel: 0
+--Type: 1
+-Message Body:
+--ID: 0156721
+--Live: 1 (keep connection open indefinitely for live replication)
+--User data: <noise details>
+--Extensions: noise
+--Acknowledge: 1 (must acknowledge each fragment received)
+```
+-PeerB then sends back a `Handshake` message to complete the handshake:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 1
+-Message Body:
+--ID: 0156721
+--Live: 1
+--User Data: <noise details>
+--Extensions: noise
+--Acknowledge: 1
+```
+-PeerA sends PeerB a `Want` message, indicating it wants all fragments:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 5 (Want)
+-Message Body:
+--Start: 0
+```
+**NOTE:** The `Length` field isn't included in the `Message Body` to indicate PeerA wants the entire feed.
+-PeerB then sends a `Have` message to `PeerA`, indicating they have the data:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 3 (Have)
+-Message Body:
+--Start: 0
+--Length: <feed length>
+```
+**NOTE:** This indicates that PeerB has the entire feed (fragments 0 and 1).
+-PeerA then sends a series of `Request` messages to PeerB for each fragment:
+Request for fragment *0*:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 7 (Request)
+-Message Body:
+--Index: 0
+--Nodes: 0 (send back all hashes to verify this fragment)
+```
+Request for fragment *1*:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 7 (Request)
+-Message Body:
+--Index: 1
+--Nodes: 0
+```
+-Upon receiving the `Request` for fragment 0, PeerB immediately sends fragment 0 in a `Data` message:
+```
+-Length
+C/T:
+--Channel: 0
+--Type: 9 (Data)
+-Message Body:
+--Index: 0
+--Value: <contents of index in binary>
+--Nodes:
+----Index: <hash number of fragment 0>
+----Hash: <32 byte hash for fragment>
+----Size: <fragment data length>
+----Signature: <signature of root hash>
+```
+-Upon receiving the `Request` for fragment 1, PeerB immediately sends fragment 1 in a `Data` message:
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 9
+-Message Body:
+--Index: 1
+--Value: <contents of index 1 in binary>
+--Node 1:
+----Index: <hash number of fragment 1>
+----Hash: <32 byte hash for fragment 1>
+----Size: <fragment data length>
+----Signature: <signature of root hash>
+--Node 2:
+----Index: <hash number of parent 1>
+----Hash: <32 byte hash for parent 1> (hash of fragment 0 and fragment 1)
+----Size: <parent data length>
+----Signature: <signature of root hash>
+```
+
+This is absolutely a giant pseudo-representation, considering all messages over the wire are in binary. The above examples aren't completely scientifically accurate, but should help build a mental model of how DWEB-based communications take place. It should be clear that multiple datasets can be exchanged with the same peer over the same TCP connection by using multiple channels. This is also one of the reasons a `Handshake` message utilizes a unique ID and the initial `Feed` message uses a randomly generated `nonce`.
+
+### Protocol For A New Web & Beyond
+While HTTP allows a client to request and receive data from a server, DWEB allows a peer to request and receive data from another peer or a set of peers. While one of the main use-cases for the dWeb is for the exchange of a dDrive that mostly contain websites and web applications, it can also be used to exchange distributed databases or even plain binary data. This means DWEB could be used to power a decentralized domain name system, a peer-to-peer phone system, live video streaming, as well as a multitude of other use-cases.
+
+The most powerful aspect about the dWeb is that the requestor can cryptographically validate what the sender is sending. At the very same time, the requestor can request specific versions of specific fragments, which in the the case of a dDrive, equates to a requestor being able to view a specific version of a website or a web application. Since a dWeb network address is generated and wholly owned by a dataset's author and announced on a DHT that's distributed across potentially thousands or millions of computers globally - where the announced dataset is spread across the peers who consume it - it's safe to say that it would be impossible to take the dWeb offline. And the same goes for the data distributed across it, as long as the data maintains a group of peers in multiple locations.
+
+Even though data exchanged over the dWeb protocol is not natively encrypted, overlaying protocols like [DWCIP](https://github.com/peepsx/dwcip-whitepaper) can be used to handle message encryption. NOISE can be used at the `Handshake` phase as well, which may make encryption seem native. When it's all said and done, websites and web applications are for more secure when distributed over DWEB compared to when they are distributed over HTTP. For hackers, a DDOS attack is useless because of how data is accessed and distributed. This is great news for website owners on the dWeb.
+
+DWEB's [advantages](#advances-and-advantages) are clear when compared to the HTTP protocol, as well as the World Wide Web, for which HTTP happens to be the glue for. But it's DWEB's ability to grow beyond a World Wide Web alternative, in the process liberating many other forms of communication where freedom is under attack, that make DWEB such a viable solution to the attacks on freedom that are becoming rampant on the World Wide Web.
+
+##dWeb Applications
+While Electronic Mail and DNS are considered to be foundational Internet applications, dDNS and dReport are examples of what can be considered as foundational dWeb applications. The subsections that follow will layout the dWeb's decentralized domain name system and reporting system, both of which utilize dWeb's `on-chain` and `off-chain` protocols.
+
+### dDNS
+Since the dWeb and the DWEB's protocol suite are not dependent on centralized domain names and the Internet's tree-structured name space, and are not compatible with the Internet's "Domain Name System" (as defined in RFC 1034 and 1035), the dWeb needed its own domain name system that was compatible with dWeb network addresses. The dWeb would be pretty hard to use without domain names or a directory-like service for dWeb network addresses, considering that 32-byte addresses are difficult to remember.
+
+This section explains the Decentralized Domain Name System (dDNS) and how human-readable names can be resolved to dWeb network addresses.
+
+#### dDNS Overview
+The Domain Name System is a directory lookup service that provides mapping between the names of a host on the Internet and a numerical address or a canonical name. DNS is essential to the functioning of the Internet. Like DNS, dDNS is a directory lookup service and provides a mapping between the name of a dDrive, device or peer and a dWeb network address. dDNS is essential to the functioning of the dWeb.
+
+#### dDNS Operation Overview
+-1. A user requests a dWeb network address for a given dTLD.
+-2. A resolver queries the local `NameDrive` in the same location as the resolver (typically on a user's computer) to see if the record is being kept in a local database or cache; if so, returns the dWeb network address to the requestor.
+-3. If the record cannot be found locally, the dWeb's root system is queried via ARISEN for the "authoritative NameDrive(s)" (ND record) for the domain name. An ND record, like other record types, points to a dWeb network address that usually resolves a dDrive where the domain's records are stored in various JSON files.
+-4. The database within the NameDrive(s) is queried for the requested record. If found, the record is returned to the requestor and cached in the requestor's local NameDrive for the time specified in the TTL record field of the retriever `Resource Record` (RR).
+-5. The user's dWeb client or web browser is given the dWeb key, or an error message (see [Error Messages](#ddns-error-messages), so it can begin the download process using [DWEB](#dweb).
+**NOTE:** It's important to note that a NameDrive is simply a [dDrive](#ddrive) that contains files/folders that store various RRs using the [Resource Record Format](#resource-record-format) in various JSON files.
+
+```
+[User System]
+         |
+         X
+         |
+[dWeb Client]
+         |
+         X
+         |
+   [Local ND] <--> cache
+         |
+         X
+         |
+     DWEB <-->> [Root System] <--> [ND Record For Domain]
+                                                                     |
+                                                                     X
+                                                                     |
+                                                      [Domain's Name Drive]
+                                                                     |
+                                                                     X
+                                                                     |
+                                                        [Resource Record]
+```
+
+#### The Root Network
+The dWeb utilizes [ARISEN](#arisen) and the [dDNS Contract](https://github.com/peepsx/ddns-contract) as its Root dDNS system. This means ARISEN is responsible for the management of the dWeb's domain name space and each domain's authoritative ND records. New dTLDs can be added to the root of the domain tree through dTLD auctions as previously explained in this paper.
+
+##### Root Database Actions
+The Root System's database is managed by the `ddns` contract on ARISEN, where its RR data structure is clearly defined. The contract defines the following actions as well:
+
+###### *_add_*:
+The `add` action allows a user to add an ND record for a domain. The user must provide the following parameters:
+-`domain` - This is the domain the record is associated with; also used for authentication.
+-`record_name` - The record name for the ND record (e.g., nd1.domain.dcom).
+-`type` - See [Resource Record Types](#resource-record-types) (`ND` in this case).
+-`class` - This autofills `DW` (dWeb); similar to `IN` with regular DNS.
+-`TTL` - Typically when an RR is retrieved from a nameserver, or a NameDrive in this case, the retriever will cache the RR so that there is no need to query the ND or root network repeatedly. This fields specifies the time interval that the resource record can be cached before the ND or root network should be queried once more. Format should be in seconds.
+-`rdata` - Similar to the `Rdata` field with regular DNS systems, only instead of 32 bit IPv4 addresses, this field stores a 64 bit dWeb network address.
+**NOTE:** There is no need for `Rdata Field Length` since dWeb network addresses always have the same length in octets.
+
+###### Updating a record
+There isn't an update action. Instead, if an `add` action is executed using a `domain` and `rname` that already exists, the record will be modified with the new record data that is submitted as a part of the required parameters for `add` (ttl, rclass, rtype and rdata).
+
+###### *_delete_*:
+The `delete` action allow users to remove an ND record.
+
+The user must provide the following parameters with the `delete` action:
+-`domain` - Domain associated with the ND record; used for authentication.
+-`record_name` - The ND record name being deleted.
+
+Many tools are available for interacting with the root system and managing a domain's ND records:
+-[ARISEN's Open RPC API](https://docs.arisen.network)
+-[arisecli](https://arisen.network/arisecli)
+-[dDNS CLI](https://github.com/peepsx/ddns-cli)
+
+#### Decentralized Top-Level Domains (dTLDs)
+As mentioned in previous sections, dTLDs can be put up for auction and won by anyone. While the winner has the sole power to determine who can sell the dTLDs they win, they cannot control the domain names associated with a dTLD. As an example, @peeps can sell ".dnet" domains since they won the ".dnet" dTLD, but they cannot control the domains they register for others, nor do they ever see the keys associated with the domains they act as registrars for.
+
+This is because a domain name, regardless of the dTLD within the root name space it belongs to, is not different than a blockchain account. Unlike typical blockchain accounts, each domain operates around a permissions system where different ND records can each be managed by different permission-levels and their associated keypairs. Changes to or the creation of ND records associated with a domain name, must be signed with the private key associated with the permission level that is ultimately associated with a domain name's ND record. All permission levels of a domain fall under the domain's root permission level known as `owner`. Therefore, domain names are forever controlled by the user who possesses the `owner` keypair, which can reset the keypairs related to any permission level existing beneath it.
+
+For example, a domain can have unlimited ND records, which means its RRs can be stored across many Name Drives, each of which contain a distributed database that stores the RRs, just like RRs can be stored across many name servers on a traditional domain name system. With this setup, one ND record could be under the control of one permission level and another ND could be under the control of an entirely different permission level. This further protects ND records from being altered or manipulated by hackers. As an added bonus, like accounts, domains can hold a multi-currency balance while also being able to send and receive payments.
+
+### Name Drives
+A "NameDrive" (ND) is the dWeb's version of a "Name Server" (NS) and is where a domain's "Resource Records" (RRs) are stored. This relieves the "Root Network" from having to manage every single RR for every domain on the dWeb, while also further decentralizing the domain name system amongst domain holders.
+
+A NameDrive, as previously mentioned, is a dDrive where domains are root folders in the drive, and record types for the domain (D, CNAME, MINFO, ND, SRV and TXT) are sub-folders of a domain folder. Records are stored within individual files located within a record-type folder and are formatted using the Resource Record Markup Language which utilizes the `.rrml` file extension.
+
+An example NameDrive would look something like this:
+```
+domainA.dcom/ (domain folder in root of the drive)
+--/D/ (record-type folder; a sub-folder of a root domain folder)
+----*.rrml (root wildcard record of the `D` record type)
+----www.rrml ("www" record of the `D` record type)
+--/CNAME/ <record-type folder of the `CNAME` type)
+----test.rrml ("test" record of the `CNAME` record type)
+domainB.dcom/
+--/D/
+----*.rrml
+--/MINFO/
+----jared.dcom (record associated with the `jared.domainA.dcom` address (mailbox))
+```
+
+#### Resource Record Data Structure
+Every single RR has the same record structure seen with the `ND` record structure at the `root system`. That structure includes the following:
+
+-`record_name` - The record name.
+-`type` - The record type.
+-`class` - The record class.
+-`ttl` - The time-to-live for the record.
+-`rdata` - The dWeb network address or `record_name` (for a CNAME record).
+
+The difference being that within the files that store RRML-formatted record data, the record_name is omitted since it's the name of the file as well as the `class`, and it's the name of the folder that the record record data resides in. RRML adds a few more markup tags that provide extra data regarding the record itself, which are discussed in [Resource Record Markup Language](#resource-record-markup-language).
+
+#### Resource Record Types
+As mentioned previously, RR types are always sub-folders within a domain folder. The following RR types are a part of the dDNS standard (DWRFC-0001):
+
+| Type | Description |
+| --- | --- |
+| D | A dWeb network address; the dWeb alternative to an `A` record. |
+| CNAME | A canonical name or alias name for another `D` and maps this to the canonical name. |
+| MINFO | An email address (mailbox) name that maps to a dWeb network address. |
+| ND | Authoritative NameDrive for this domain. |
+| SRV | Provides the name of a peer, service or device that is mapped to a dWeb network address. |
+| TXT | Arbitrary text that provides a way to add text comments to the database. |
+
+#### Resource Record Classes
+The following are RR classes found within a record's `rrml` file:
+
+| Type | Description |
+| --- | --- |
+| DW | Indentifies the DWEB protocol family. |
+| DM | Identifies the DMESH protocol family. |
+
+#### Resource Record Name
+An RR name (record name) is simply the name of the record itself (e.g., "www"). Valid names include A-Z, a-z and 0-9.
+
+#### Resource Record TTL
+Must be a numeric value for how long the record should be cached.
+
+#### Resource Record Data
+RR data (rdata) is either a dWeb network address (for D, MINFO, ND, SRV and TXT types) or a canonical (alias) name for an already existent `D` record.
+
+#### Resource Record Markup Language
+`.rrml` files are formatted using the Resource Record Markup Language, which is a JSON-style format that is easily parseable by languages like JavaScript.
+
+Below is an example RRML file for a `www` `D` record:
+```JSON
+{
+  "class": "DW",
+  "ttl": 300,
+  "rdata": "aae4f36bd061a7a8bf68aa0bdd0b93997fd8ff053f4a3e816cb629210aa17737",
+  "created": 1463443200000,
+  "description": "my website",
+  "author": "@jared",
+  "modified": 1474371000000
+}
+```
+
+##### RRML Tags
+The following RRML tags are a part of the RRML Specification (DWRFC-0002):
+
+-`class` (Required) - The record class; see [Resource Record Class Types](#resource-record-classes).
+-`ttl` (Required) - The record's [Time-to-live](#resource-record-ttl).
+-`rdata` (Required) - The [Record data](#resource-record-data).
+-`created` (Optional) - UNIX Epoch of the time the record was created.
+-`description` (Optional) - Description of record (string).
+-`author` (Optional) - Author of information (string).
+-`modified` - UNIX Epoch of the time the record was last modified.
+
+#### Record Resolution
+Each query begins at a name resolver located in the user's host system. Each resolver is configured to know the name and address of a local NameDrive that's used for caching records. The local ND is used to cache RRs for various domains that the user accesses to limit the lookups for frequently requested records.
+
+##### 1. Querying The Local NameDrive
+Like with public NameDrives, a local NameDrive stores domains, record types and record data in the same formats discussed previously. The only difference is that it only stores records for the allotted time found in each record's `ttl` RRML tag.
+
+Querying a local ND for a record is as easy as accessing the record's anticipated path, like so:
+
+`/home/LocalND/domainA.dcom/D/www.rrml`
+
+This should return the RRML for the given record which can be easily parsed.
+
+##### 2. Querying The Root System
+If a domain or RR for the specified domain is not found within the local NameDrive, the Root System (ARISEN's `ddns` database) is queried for the domain's ND record(s). Most domains only need one ND and since it's not a server and is completely distributed amongst peers, it will probably never go offline. The Root System can be queried via [ARISEN's Open RPC-based API](https://docs.arisen.network) and will return a dWeb network address for a specified domain and record name, if the ND record is stored in the Root System.
+
+##### 3. Looking Up dWeb Network Address
+The dWeb network address is searched for on dWeb's DHT until it returns a list of peers for the address.
+
+##### 4. Downloading And Querying NameDrive
+Once (peers) are located, the NameDrive is download over [DWEB](#dweb) and the record can be queried via the local location of the NameDrive, like so:
+`/home/DDrives/<namedrive-key>/domainA.dcom/D/www.rrml`
+
+Once the `rdata` is parsed from the RRML, the dWeb network address has been successfully resolved.
+
+A dWeb client can now move the record to the local NameDrive for the allotted TTL and delete the rest of the downloaded NameDrive. Another alternative dWeb clients can take is to live replicate a NameDrive within a local folder, so that a frequently accessed domain's records are always up-to-date and available locally, which means the TTL can be ignored altogether. This is made possible through the nesting of other NameDrives within the local NameDrive.
+
+#### Truly Distributed Resource Records
+dWeb's DNS system is far more distributed and decentralized than the World Wide Web's traditional DNS system. Many factors stand out, such as:
+
+-Domains are fully and forever owned by users and cannot be used in any way without the domain owner's `owner` keys.
+-dTLDs are not controlled by a centralized organization who has the ability to choose who can or cannot register a domain, nor do they have the ability to take control of or restrict a domain that belongs to its part of the domain tree.
+-NameDrives are a server-less alternative to a NameSever, which is used to store multiple domain zones and RRs.
+-A Domain's authoritative ND record is stored on ARISEN and is controlled only by the domain owner.
+-A NameDrive, unlike a NameServer, is distributed by peers who are currently accessing its records as well as those who choose to seed (host) it. This means that most NDs do not have a central point of failure.
+
+For these reasons, dWeb's dDNS system is a far more effective and reliable solution when compared to traditional DNS systems.
+
+### Reporting System
+dWeb's reporting system, dReport, is used by the community to report content that is considered illegal under the dWeb's Constitution. Entire websites and accounts that take part in illegal activity can be reported as well. The goal of dReport is to prevent the dWeb from becoming a darknet-like network and to keep the dWeb from becoming a safe-haven for criminal activity.
+
+dReport is an ARISEN contract deployed under the name `dreport` that allows report submissions and community members to vote on specific submissions. dWeb's elected governance has the authority to remove data, accounts, dWeb network addresses and domains related to the activity reported in submissions. User Interfaces can easily be developed around the @`dreport` contract, providing an easy way for anyone to submit and vote on reports. Applications like a social network or marketplace could integrate a reporting feature that interacts with the `dreport` contract as well. See [dSocial Reporting System](https://github.com/peepsx/dsocial-whitepaper) to see how dSocial is developing their dWeb-based social network around dReport.
+
+#### System Reference
+The following `actions` can be executed via the `dreport` system:
+-[`report`](#report)
+-[`expire`](#expire)
+-[`vote`](#vote)
+-[`unvote`](#unvote)
+-[`comment`](#comment)
+-[`uncomment`](#uncomment)
+-[`alert`](#alert)
+
+##### Actions
+
+###### `report`
+Propose a new report to the community.
+
+**Parameters**
+| Name | Type | Description |
+| --- | --- | --- |
+| reporter | name | ARISEN account creating the report; used for authentication. |
+| report_uuid | name | UUIDv4 for the report. |
+| title | string | The report's title (must be less than 1024 characters. |
+| report_json | string | See [Report JSON Structure] (#report-json-structure). |
+| expires_at | time_point_sec | Expiration data of report; must be no later than six months in the future. |
+
+**Rejected**
+-When missing signature of `reporter`.
+-When `report-uuid` already exists.
+-When `title` is longer than 1024 characters.
+-When `report_json` JSON is invalid or too large (must be a JSON object and be less than 32,768 characters).
+-When `expires_at` data is earlier than now, or later than 6 months in the future.
+
+###### `expire`
+Immediately expires a current active report. The report can only be expired by the original reporter that created it. It's not valid to expire an already expired report.
+
+**Parameters**
+| Name | Type | Description |
+| --- | --- | --- |
+| report_uuid | name | The report's UUIDv4 to expire. |
+
+**Rejections**
+-When missing signature of report's `reporter`.
+-When `report_uuid` does not exist.
+-When `report-uuid` is already expired.
+
+###### `vote`
+Vote for a given report using your account.
+
+**Parameters**
+| Name | Type | Description |
+| --- | --- | --- |
+| voter | name | The voter's ARISEN account. |
+| report_uuid | name | The report's UUIDv4 to vote on. |
+| vote | uint8 | Your vote: `0` = negative vote; `1` = positive vote. |
+
+**Rejections**
+-When missing signature of `voter`.
+-When `report_uuid` does not exist.
+-When `report_uuid` is already expired.
+
+###### `unvote`
+Remove your current active vote from a report, which will allow the voter to reclaim the RAM used to store their vote.
+
+**Parameters**
+| Name | Type | Description |
+| --- | --- | --- |
+| voter | name | The voter's ARISEN account. |
+| report_uuid | name | The report's UUID to remove your vote from. |
+
+**Rejections**
+-When missing the signature of `voter`.
+-When `report_uuid` does not exist.
+-When `report_uuid` is expired but within its freeze period of 3 days.
+
+###### `comment`
+Create a comment in relation to a `report_uuid`.
+
+**Parameters**
+| Name | Type | Description |
+| --- | --- | --- |
+| commenter | name | The ARISEN account of the commenter. |
+| comment_uuid | string | The comment UUID (for reply purposes). |
+| comment_content | string | The comment data. |
+| reply_to_commenter | name | The initial comment's commenter that your comment replies to. |
+| certify | bool | Reserved for future use. |
+| reply_to_commenter_uuid | string | The initial comment's UUID that your comment replies to. |
+
+**Rejections**
+-When missing signature of `commenter`.
+-When `comment_content` is an empty string.
+-When `comment_content` is bigger than 10,240 characters.
+-When `comment_uuid` is an empty string.
+-When `comment_uuid` is bigger than 128 characters.
+-When `reply_to_commenter` is not set but `reply_to_commenter_uuid` is.
+-When `reply_to_commenter` is not an existing account.
+-When `reply_to_commenter` is set and `reply_to_commenter_uuid` is an empty string.
+-When `reply_to_commenter` is set and `reply_to_commenter_uuid` is bigger than 128 characters.
+
+###### `uncomment`
+Remove a comment.
+
+**Parameters**
+| Name | Type | Description |
+| --- | ---- | --- |
+| commenter | name | ARISEN account of commenter. |
+| comment_uuid | string | The UUIDv4 of the comment to remove. |
+
+**Rejections**
+-When missing signature of `commenter`.
+-When `comment_uuid` is an empty string.
+-When `comment_uuid` is bigger than 128 characters.
+
+###### `alert`
+An `alert` action can be executed by any ARISEN user if a report has reached the required `threshold` of votes (See [Report JSON Structure](#report-json-structure)). `alert` sends details to all 21 of dWeb's elected governance.
+
+**Parameters**
+| Name | Type | Description |
+| alerter_account | name | The account initiating alert (will pay CPU/Net fees). |
+| report_uuid | name | Report UUIDv4 of report. |
+
+**Rejections**
+-When `report_uuid` has not met voting threshold.
+-When `report_uuid` has expired.
+
+##### Tables, Data Structures & On-Chain Database
+The `dreport` data and database tables exist in an `on-chain` database on ARISEN's mainnet, under the name `dreportdb`.
+
+Data that derives from the actions previously outlined are saved in one of the following tables:
+
+###### `reports` (Table)
+**Row**
+| Row Name | Type | Description |
+| report_uuid | name | UUIDv4 of the report. |
+| reporter | name | The ARISEN account of the reporter's account. |
+| title | string | The report's title. |
+| report_json | string | The report's JSON metadata. |
+| created_at | time_point_sec | The date the report was created. |
+| expires_at | time_point_sec | The date at which the report expires. |
+
+**Indexes**
+-First (`1` type `name`); index by `reporter_uuid` field.
+-Second (`2` type `name`); index by `reporter` field.
+
+###### `vote (Table)
+**Row**
+| Row Name | Type | Description |
+| vote_uuid | uint64 | The unique ID of the vote. |
+| report_uuid | name | The UUIDv4 of the report the vote is for. |
+| voter | name | ARISEN account of the voter. |
+| vote | uint8 | The vote value for the vote (0 or 1) |
+| vote_json | string | The vote's JSON metadata. |
+| updated_at | time_point_sec | The date at which the vote was last updated. |
+
+*Indexes**
+-First (`1` type `i64`); index of `vote_uuid` field.
+-Second (`2` type `i28` input in hexadecimal little-endian format); index by `report_uuid`, the key is composed in the high bytes using the `report_uuid` and the low bytes of the `vote`.
+-Third (`3` type `i28` input in hexadecimal little-endian format); index by `voter`, the key is composed in the high bytes using the `voter` and the low bytes are the `report_uuid`.
+
+##### Report JSON Structure
+The `report_json` parameter requires a specific JSON-valid structure, which should contain many required fields. Report and reason types must be valid, per DWRFC-3`.
+
+An example of Report Metadata is below:
+```
+{
+  "type": "content", // Type of medium where activity is taking place.
+  "reason": "illegal-pornography", // Report reason category.
+  "threshold": "300", // Vote threshold to qualify for `alert` action.
+  "status": "emergency", // Report status.
+  "domain": "porn.dcom", // Domain where content exists.
+  "dweb_address": "<dweb-key>, // Related dWeb address.
+  "full_domain": "dweb://porn.dcom/user/post/3", // Full link to illegal content.
+  "risk": "10", // Risk to community.
+}
+```
+
+###### Report Types (`type`) (Required)
+Report types should be listed in the `type` field of the `report_json` structure. The following types are valid:
+-`content` - Report involving specific content on the dWeb.
+-`website` - Report involves website where illegal content makes up a large portion of its content.
+-`application` - Report involves an application where illegal content makes up a large portion of its content.
+-`drive` - Report involves a dDrive or distributed file system where illegal content makes up a large portion of its content.
+
+###### Report Reasons (`reasons`) (Required)
+Report reasons should be listed in the `reason` field of the `report_json` structure. The following reasons are valid:
+
+-`counterfeit_items` - Content or activity involves counterfeit items.
+-`counterfeit_money` - Content or activity involves counterfeit money.
+-`fraud` - Content or activity involves fraud.
+-`illegal_drugs` - Content or activity involves illegal drugs.
+-`illegal_pornography` - Content or activity involves illegal pornography.
+-`violence` - Content or activity involves illegal violence.
+
+###### Report Threshold (`threshold`) (Required)
+A report threshold is the amount of positive votes needed for a message to be sent to all 21 governance members concerning the issue, using the `alert` action. By default, `alert` requires AT LEAST `300` positive votes. Report thresholds should be listed in the `threshold` field of the `report_json` structure.
+
+###### Report Status (`status`) (Required)
+Report statuses should be listed in the `status` field of the `report_json` structure. The following statuses are valid:
+-`regular` - A regular report.
+-`emergency` - An emergency report, which should drop the default `alert` threshold to `10` votes.
+
+###### Report dWeb Address (`dweb_address`) (Optional)
+The dWeb address related to a report should be listed in the `dweb_address` field of the `report_json` structure. It is only required if the illegal activity or content involves a dWeb network address.
+
+###### Report Full Domain (`full_domain`) (Optional)
+The full domain path related to a report should be listed in the `full_domain` field of the `report_json` structure. It is only required if the illegal activity or content involves a specific address, not a website or web application at-large.
+
+###### Report Risk Rating (`risk rating`) (Required)
+The risk rating related to a report should be listed in the `risk rating` field of the `report.json` structure. It is required for all reports. A risk rating is a rating from `1` (the least) to `10` (the most) and is for grading the risk that the activity or content poses to the community.
+
+#### A Safer Web
+Users and developers on the dWeb must have a way to protect themselves and the dWeb at-large from digital habitats that harbor criminal activity without introducing centralization into the network, which would inevitably be abused and used to eventually restrict the freedoms of the dWeb's users and developers. dReport utilizes the limited and checked authority of ARISEN's [Governance](#governance) and a decentralized community reporting system to give community members the ability to properly alert governance members of illegal activity and content, so that the governance can move to take one of the following actions:
+
+-Change keys for the `domain` involved.
+-Blacklist the dWeb network address involved.
+-Reverse fraudulent transactions (stolen funds).
+-Change keys of ARISEN accounts involved.
+-Remove illegal content from on-chain datastore.
+
+Morally unacceptable behavior like hateful comments, fall under dWeb's Constitution as within a user's right, and are therefore "unbannable behavior." Illegal activity, on the other hand, such as a user selling illegal drugs, is considered "bannable behavior." dWeb governance members are not permitted to ban accounts for morally unacceptable behavior and if they do, users of the dWeb can elect new governance members and reverse the actions taken. Illegal activity, on the other hand, will not be tolerated and shouldn't be.
+
+Any governance action mentioned above requires a 15/21 majority vote.
+
+## The Decentralized Web
+I hope this paper has thoroughly explained the various protocols and abstractions that help form dWeb's unbreakable fortress of freedom. As I have pointed out in past papers, the dWeb provides true end-to-end decentralization for communications, websites, web applications and other mediums. While the dWeb utilizes transport protocols like TCP and UDP, it is truly transport agnostic. Like most protocols, it doesn't know anything about the layers beneath it. The same goes for the Internet Protocol (IP). Even through dWeb's DHT stores peers in a swarm according to their IP address and port number, the DHT will store any kind of data and therefore the dWeb is Internet-agnostic as well.
+
+I say all of that to emphasize that the dWeb can and will provide end-to-end decentralization across any and all environments, and is here to stay. Below, I want to briefly review each area of dWeb's decentralized spectrum of services.
+
+### Decentralized Web Hosting
+The dWeb eliminates the need for web hosting since the files for websites and web applications are distributed within a dDrive and hosted amongst the peers who view them. The dWeb makes way for a serverless web.
+
+### Decentralized Network Addresses
+The dWeb doesn't use IP addresses for addressing entities on the network; rather it uses 64-bit hexadecimal addresses that are wholly owned by the creator of the address.
+
+### Decentralized Data
+Web applications can store app-related data via `on-chain` databases, or via `off-chain` databases such as [dWebTrie's](#dwebtrie) key value store. Either way, the users who create the data are in control of the data and not the application itself. The data is also immutable, although the creator always has the option to remove the data from the dWeb.
+
+### Decentralized Authentication
+Applications that utilize ARISEN's universal authentication layer provide users with a simple and decentralized form of authentication. Applications on the dWeb, unlike traditional web applications, do not store a user's authentication details. Instead, a user is always in control of their authentication details and is able to authenticate using ARISEN's autonomous and decentralized authentication layer.
+
+### Decentralized Domain Names
+Users of the dWeb are able to become registrars of their own dTLDs, and other users are able to register domains under those dTLDs which they wholly own and control for the lifetime of the dWeb. Domains are impossible to seize and are completely decentralized. The dWeb is also backed by a decentralized domain name system, where DNS records are completely distributed and only modifiable by the domain's owner.
+
+### Decentralized Payments
+The dWeb and the applications that are distributed across it, are only compatible with decentralized payment network like Bitcoin, due to the code of all dWeb-based applications being open source. This means that the earnings of a user or business can never be seized and, as a result, have actual intrinsic value.
+
+### Decentralized Binary Exchange
+At its lowest levels, dWeb is simply a protocol for the peer-to-peer exchange of binary, which opens the door to the decentralization of all kinds of systems - from phone systems to live-streaming services. Even the decentralization of the physical and centralized Internet infrastructure beneath it.
+
+### Decentralized Abstraction & Governance
+The dWeb is the first web ever created that is governed by duly elected governors, whom are voted in by the network's users. dWeb's governance insures that the dWeb will always remain safe for users and is programmatically prepared to halt illegal activity and reverse fraud against its users. This form of decentralized arbitration, regulation and governance rids the dWeb and its community of needing a central government or central regulatory body to "protect" it from bad actors, or even worse, "terrorism."
+
+## Beyond The Coin
+The terms "blockchain" and "peer-to-peer" have a bad reputation, and it's due to the legal attacks that have been leveled on the many projects associated with these terms over the years. I'm sure you've seen them:
+
+-ICO scams.
+-Bitcoin and drug cartels.
+-Torrents.
+-Illegal file sharing.
+-The DarkNet.
+
+The problem is, I rarely here these very same voices speak out about the many technological advances that blockchain and peer-to-peer technologies have helped to bring about. In fact, most people have never heard of these advances, because unfortunately, they only hear about the so-called scams and failures associated with them. At the very same time, one must not forget how much deep state neo-fascists hate decentralization. The controlling elite are very worried about the threat decentralized and encrypted communication protocols pose to the likelihood that they can pull off the "Great Reset."
+
+Brave individuals like myself have attempted to utilize various decentralized technologies to re-imagine things like our banking system, and we were attacked by deep state operatives within our own government and imprisoned for simple mistakes found within published blog posts. This is because people like me understand how scared these factions are that decentralization will help spark the "Great Awakening" before they can successfully pull of their Great Reset. The legal onslaught unleashed on me and a handful of others has created "obedient" software developers who are scared to face the beast. At the very same time, many of those developers are "all about the coins," as I like to say, and are only it for the money. I do this because the beast you were just awakened to, is a beast I've been at battle with for years. Now that I've been inside it for 26 months, I am far more familiar with it than any of my counterparts, and it has played a major role in our development of the dWeb.
+
+For the past few years, I've come to understand the beast's greatest weapon - the prison industrial complex - and how to avoid falling victim to it once more. One may even wonder how an imprisoned team of software developers were able to do all of this from within a prison to begin with? The answer is simple: our clear and concise understanding of the best itself. One must first understand what the beast uses to attack those who try to free its slaves and how it attacks. The beast uses its judicial and executive arms in tandem to:
+
+-1. Accuse the opposition of fraud where "commerce" is the means (e.g. accuse the opposition of scheming for money in some capacity).
+
+This is almost always successful because decentralized software is open source, highly complex, takes an extraordinary time to develop and, considering it's decentralized, the developers almost never have a way to create any sort of income to keep, at very minimum, the lights on. It's also important to note that projects of this size are rarely built by a single individual. Considering cryptocurrencies are an element of blockchain technology, developers conjured up the ICO (Initial Coin Offering), in which coins are sold to supporters in order to support the cost of developing their various ideas, just as I did with AriseBank. It wasn't long before the SEC figured out that these developers were selling what they referred to as "unregistered securities," and I was eventually the guinea pig for the country's first crypto-based securities fraud case. It's also a way for the beast to somehow convince the public that a few patriotic software developers were actually just a bunch of scammers. Nothing to see here folks! We're glad we could protect you from these evil, benevolent men. Carry on!
+
+-2. They then use the court system to seize the threat (the software), while convincing "their" court that it's in the best interest of the "harmed supporters" that they also raid the developers and seize all available funds, computers, servers, domains and documentation.
+
+By seizing everything, onlookers in the general public reading the news about the alleged fraud having nothing to base their opinion on except the contrived allegations. It's the sort of strategy you're seeing with the 2020 election and the whole "where's the evidence" debate (evidence is uploaded to Twitter, then quickly fact-checked and removed before anyone has a chance to see it). AriseBank's websites and software were only available over the centralized web, as well as the HTTP protocol, which made the seizure of the "arisebank.com" domain and the thousands of pages of documentation on our centralized servers as easy as serving a warrant on the web hosting company and domain registrar. It also eliminated any evidence of the tremendous amount of work put into the project, which helped them sell the "intent" of our alleged fraud.
+
+-3. Convince the court to imprison the threat and publicize the criminal indictment of the developer(s) in order to scare other developers from pursuing similar ideas. What a mess, right? Welcome to my life.
+
+I realized rather quickly that I had made two critical mistakes. My first mistake was selling coins. I should have figured out a way to self-fund the project, but the biggest mistake I made was putting the cart before the horse. How silly was I to think that I could develop decentralized bank using centralized mediums? I even involved centralized companies like VISA into my vision. Looking back, I realized something that most are just now starting to realize. Before we can ever put banking, healthcare, media and other industries bank into the hands of the people, we have to to first have a decentralized foundation on which we can build, because the World Wide Web is certainly not the place to free America's slaves. The beast has its claws all over it.
+
+It's why less than 24 hours after the seizure of AriseBank, I began work on the dWeb. I forked other protocols that I was able to combine into what has been compiled into this paper, because I didn't trust other developers nor did I want a single central point of failure to come back to destroy that foundation. I have deeply studied the ins-and-outs of all these protocols and have thumbed through the thousands of lines of code that help form their existence to such extent, that I literally dream about them at night.
+
+I have studied numerous Data Communications courses in order to gain a deeper understanding of the holes that the beast could exploit to bring the dWeb to its knees. I have taken the last 26 months to handwrite specifications like this one, as well as many blog posts, in order to raise awareness of what is to come (until my wrist could no longer be used to write and my pen-resting finger was blistered). More importantly, I faced the challenge of doing it from behind bars and without a computer. I even had to self-fund development without a single dollar to my name which, quite frankly, was the biggest challenge of them all.
+
+The journey to launching the dWeb has been amazing, although our work is only just beginning. I can safely say that we can now "decentralize everything," considering that the dWeb gives us the necessary foundation to do so. Now it's time for developers like you to move beyond the coins and figure out a way to decentralize something. Truly decentralized cryptocurrency exchanges, even though the software cannot be seized, still find themselves in legal troubles, and it's all due to the coins being traded on their platforms, and greed getting the best of these developers. **Make the coin the utility and not the product** and you will be able to use these technologies to improve the lives of millions or even billions of people. That doesn't mean you can't take money like the rest of the world. Start a ride sharing app and take a percentage of the crypto spent on rides. Start a marketplace and take a percentage of the overall sales. Start a real news website and sell some advertising. The dWeb has the potential to create the right kind of changes for the right kind of people, and for all the right reasons. We simply must not make the coin our god or our product. We must move beyond the coin, and I promise, the best will fall.
+
+## The Case For The dWeb
+I wanted to end this paper by making the case for the dWeb. I want to discuss what many may believe to be its weaknesses, as well as its obvious advantages and advances when compared to the World Wide Web.
+
+### Perceived Weaknesses
+Below are many of dWeb's perceived weaknesses and what we're doing about them.
+
+#### Underlying Physical Internet Infrastructure
+It is true that Internet Service Providers could organize residential customers into groups that are separate from their enterprise customers, in an attempt to keep residential internet subscribers from sending packets to the ISP's switching nodes that have `control information` containing the destination of a residential customer. In other words, ISPs could share a database of residential customers, along with each customer's public IP address, so that ISPs could, in theory, prevent two dWeb peers from connecting directly to one another via their packet-switching networks.
+
+Consider the diagram below:
+```
+[UserA]
+    |
+    |
+[AT&T| ---- [Node4] ---- [Node5] ---- [TimeWarner]
+                                                                 |
+                                                                 |
+                                                            [Node5]
+                                                                 |
+                                                                 |
+                                                            [Node3] ---- [UserB]
+```
+It is true that ISPs could effectively shut down peer-to-peer transport in this fashion. Before I speak on our solution to this, it's important to understand how a dWeb message makes it from one peer to the next.
+
+-1. UserA creates the following dWeb message (`Feed` message):
+```
+-Length
+-C/T:
+--Channel: 0
+--Type: 0
+-Message Body:
+--dWeb network address
+--Random nonce
+```
+-2. The dWeb message is packaged within a UDP datagram like so:
+```
+-PeerA port
+-PeerB port
+-Length
+-Checksum
+-UDP Body: (dWeb message)
+--Length
+--C/T:
+----Channel: 0
+----Type: 0
+--Message Body:
+----dWeb network address
+----Random nonce
+```
+-3. The UDP datagram is then packaged in an IP datagram, like so:
+```
+-Version: 4
+-IHL: 5
+-DS:
+-ECN: 00
+-Total Length: 1000
+-Identification: 000001
+-Flags: [Don't Fragment]
+-Fragment Offset
+-Time To Live: 10
+-Protocol: 17 (UDP)
+-Header Checksum: <header checksum>
+-Source Address: UserA's public IP
+-Destination Address: UserB's public IP
+-Options: <user options>
+-Padding: <variable header padding>
+-Data: (UDP and dWeb datagrams)
+--PeerA Port
+--PeerB Port
+--Length
+--Checksum
+--UDP Body:
+----Length
+----C/T:
+------Channel: 0
+------Type: 0
+----Message Body:
+------dWeb Network Address
+------Nonce
+```
+-4. The IP datagram is handed off to different switch nodes that route packets to the destination (PeerB).
+-5. Once PeerB receives the IP datagram, it strips off the IP header to get to the UDP message, which shows the port the UDP data is meant for on PeerB's device and then strips off the UDP header (PeerA Port, PeerB Port, Length & Checksum).
+-6. PeerB's computer sends the UDP Body (dWeb message) to the specified port, where the dWeb client operates and can consume the dWeb message in whatever way the client consumes dWeb messages.
+
+Simply put, a dWeb message is handed down to the transport layer (in this case UDP) to prepare the message for transport over the Internet, where it is packaged within a UDP datagram along with PeerB's port. The UDP datagram is then packaged within an IP datagram that contains PeerB's public IP address and other control information, which is then transported out via PeerA's IP and their Wide Area Network (WAN). The IP datagram contains PeerB's destination information which each switching node (router) will use to route this datagram to PeerB.
+
+If these switching nodes are configured to reject destinations that belong to residential subscribers, and if the source of the datagram is also a residential subscriber, then this would completely eliminate the ability for two residential subscribers (two dWeb peers) to communicate.
+
+But the problems wouldn't stop there.
+
+I just showed how this sort of adjustment would shutdown the communication (sharing of data) between peers. Although, this would also shutdown the discovery of peers as well. If you recall, in [DWDHT](#dwdht) I explained the peer discovery process and how peers of the dWeb each represent a DHT node on the network, each of which ends up storing a portion of the table (a portion of the announced dWeb network addresses and the peer info (IP and Port) of the peers swarming (announcing) the address).
+
+Let's say PeerA wants to query the DHT for a specific dWeb network address. First, DWDHT calculates which node (via algorithms previously explained) is storing the peer info related to a particular dWeb address and then PeerA queries this node for the record. Considering PeerA and the DHT node (another peer somewhere) are probably residential subscribers, the same problem that occurred in the dWeb communication process would also occur during the peer discovery process.
+
+While PeerA querying a another peer's DHT node doesn't involve the exchange of dWeb protocol messages, it does involve PeerA sending a particular question (a DWDHT message) to the DHT node, to which the DHT node would respond. In this case, PeerA would say to the DHT, "Hey, I heard you know about <dWeb network address>, do you have any info on it?" (Note: this is a pseudo-representation of the question.) Since every DHT operates on the same port (44578), PeerA creates a UDP datagram with the DHT question in the body, attaches PeerA's source port (for the remote DHT node to send the answer to) and the DHT node's destination port (44578), which is placed into an IP packet with the DHT node's IP address, and sent out to the Internet. Considering that the ISP's routers notice this packet's source is a residential subscriber and that the destination (the DHT node) is also a residential subscriber, the router aborts this transport. This means that PeerA never receives a list of peers associated with the dWeb network address since the DHT node (the destination) never receives the lookup question.
+
+This would effectively shutdown the dWeb discovery process since peers could never query DHT nodes hosted by other peers, which means they couldn't resolve a dWeb network address (retrieve a list of peers who hold the data related to a network address). This would render the [DWEB Protocol](#dweb) (the dWeb communication process) useless, since PeerA would have no idea who to send DWEB messages to (want, request, etc.) since it never received a list of peers associated with the dWeb network address it was interested in. Therefore, the dWeb communication process would never take place.
+
+I would be lying if I suggested this wasn't possible, although I will say that it would be a massive undertaking for ISPs globally to redesign their networks to prevent peer-to-peer transport. But after everything we've seen in 2020, I put nothing past the world's elite to do everything they can to advance their efforts to censor people who communicate over "their" physical infrastructure, whether it's the World Wide Web or the dWeb. It's important to note that due to dWeb's end-to-end decentralization, there is no way for an ISP, or anyone for that matter, to interfere with or exert control over the dWeb itself. However, using the doomsday scenario described above, an ISP could simply prevent residential subscribers from communicating with one another.
+
+This has nothing to do with the dWeb specifically, but rather the types of measures ISPs could take to stop the transport of peer-to-peer communications deriving from applications that utilize peer-to-peer transport, including Bitcoin, Skype, Telegram and others. While this is an unlikely scenario that will probably never transpire, if you know me then you know that our "decentralize everything" motto is not just a slogan, it represents our entire mission and I loathe potential points of failure.
+
+Therefore, it should come as no surprise that we've been hard at work on a research project called dMesh (you may have noticed this in [dDNS](#ddns) within `Record Classes`). With dMesh, we're experimenting with various analog frequencies, satellite and other forms or long range communications. The project has also included a deep drive into Bluetooth and infrared communications. In the first quarter of 2021, we will formally release some of that research, including our plans to launch a new network via dPhone, the world's first decentralized cellular device. dPhone will be powered by [PeerOS](https://peepsx.com/peeros) which will be the world's first decentralized operating system. Our goal is to build a powerful mesh network through the combination of these devices and various satellite-based transceivers. And with enough support, over the next several years we're confident that dMesh can have successful rollouts in some of America's largest cities.
+
+While the solution will take time for there to be enough devices to build a strong enough mesh network over which peer-to-peer communications can be effective over long distances, any other attempt to build an alternative physical transport medium in a more rapid fashion is guaranteed to involve some sort of government intervention and licensing, and therefore centralization. With that said, as much as we want to remove ourselves from the physical Internet that has been used to violate our privacy at every turn, I don't believe it will be used to shutdown peer-to-peer communications any time soon, due to the massive effect these types of measures would have on the many important and widely used systems that rely on it.
+
+Those systems include massive financial systems like Bitcoin that are worth hundreds of billions of dollars, as well as the Internet of Things - and I do not see major IoT companies standing idly by as the global elite destroy their companies. Let's not forget the major companies that are heavily invested in Bitcoin and other cryptocurrencies as well. Considering the DWEB cannot be individually targeted, I don't see this perceived weakness coming to fruition.
+
+#### Peer Connectivity Issues
+There are issues from time-to-time involving users on residential or mobile internet connections directly connecting to each other due to not having dedicated IP addresses or being able to accept incoming TCP connections. [dWebSwarm](#dwebswarm-api) is able to hole-punch through NAT (Network Address Translation) devices on networks which, in turn, solves the issue for most users. That being said, we are still working out issues involving specific kinds of NAT devices. We do not see this as a long-term issue, nor do we feel it will impact a large percentage of the dWeb's users.
+
+#### Closed Source Applications
+For app developers who want their applications to remain closed source, they can deploy a production build of their application using a framework like WebKit and do just that. However, these developers should keep in mind that the dWeb was not built to distribute closed source applications or applications that utilize configuration files that contain "secret" details such as passwords or API keys.
+
+The open web allows its users to see what's happening in the background of applications, which keeps applications from spying on their users without it being completely obvious in the underlying code. The closed web has allowed companies like Facebook, Google and others to easily spy on their users, without anyone having a way of spotting these sorts of contraptions. But some of these companies may argue that the dWeb is not a place for proprietary software anyway, and they would be correct. The dWeb is a web that is run by the people and is meant to protect the people. This forces software developers to constantly update their software in order to keep up with the competition. I shouldn't have to explain why open source software is better, considering open source applications have overtaken their closed source counterparts in market share time and time again. The dWeb will usher in a new open source revolution where mainstream software can be studied, audited and improved by the public. In my humble opinion, this will not only speed up the dWeb's growth over time, but will also help bring about technological advances much faster, and in a world where collaboration is truly open and conducted without any sort of interference.
+
+#### The Birth Of Another DarkNet
+Many people have brought themselves to believe that fully decentralized systems are havens for criminal activity because there is no one who is in charge or capable of stopping illicit activity. In a general sense, these people would be correct. This is why I chose to integrate a blockchain like ARISEN into DWEB's off-chain protocols. As I covered in [Governance](#governance), [Address Registration](#address-registration) and [dDNS](#ddns), the elected governance has the ability through a 15/21 vote to render network addresses and domain names useless, taking them offline and redirecting would be visitors to a blank dDrive.
+
+This is made possible by the [dReport](#reporting-system) reporting system, which allows dWeb users to report illicit content, websites and web applications so that other dWeb community members can vote on their removal. Once a vote passes a specific threshold, it is passed to the elected governance who can then take the actions necessary to remove the activity through a 15/21 majority vote.
+
+dWeb's governance and reporting system ensure that the dWeb never becomes a safe haven for criminal activity, without introducing any sort of centralization to the network and ensuring that users of the dWeb remain in control of their data, network addresses, accounts, authentication details, money and domain names.
+
+This also ensures that users cannot have their money stolen, since the governance can reverse fraudulent transactions. I'll never forget how Jones Day and the court-appointed receiver in the AriseBank case seized the money of our contributors, all to spend half of it (or possibly more) on "legal fees and expenses" with the supporters only receiving a small portion of their money back. One the dWeb, rogue government agencies like the SEC are no longer needed, since fraudulent transactions can be reversed without any loss to the "victim." If there truly are victims, they shouldn't become victims of the government as well. They should simply have their money returned.
+
+The point being that we can code protections into our decentralized applications and systems so that they never become sanctuaries for evil, or reliant on the unnecessary services of overreaching governments. And the dWeb does just that.
+
+### Advances and Advantages
+Below are many of the advances dWeb brings to the Internet, as well as the clear advantages it has over protocols like HTTP and the World Wide Web at large.
+
+#### User-Controlled Data
+Whether it's data within some sort of [dDatabase](#ddatabase)-based abstraction (like a [dDrive](#ddrive)), or data stored on [ARISEN](#arisen) via the execution of smart contract-based actions, users are always in control of their data. It's a dramatic shift from how applications on the World Wide Web are inherently in control of user data, where it has inevitably lead to the abuse of users.
+
+Due to the open source nature of the dWeb and how it's underlying protocols are designed, application data must derive from append-only binary feeds that are solely owned and operated by their creators, or on-chain data stores where the data can only be modified or removed by the ARISEN account that initially created it. This means that users can remove data from the applications they use, whether the apps want to give them that ability or not. User-controlled data is one of the more liberating features of the dWeb - a major advantage it has over the World Wide Web - and one of the biggest drivers for enabling true privacy on the dWeb.
+
+#### Zero Infrastructure Costs
+While users of the dWeb have the advantage of controlling their data, web developers have the advantage of avoiding infrastructure costs (webhosting costs) altogether. Considering the files related to a website or web application are stored within a dDrive and hosted amongst peers, servers are no longer needed to make websites or web applications available over the Internet. A web application could even utilize a smart contract deployed on ARISEN, which could be executed from within the application's code (in the dDrive) and used to authenticate the users and store related data. While smart contract executions do have RAM, CPU and NET costs, they pale in comparison to the infrastructure costs associated with hosting websites and applications on the World Wide Web. That being said, not all applications will have to use ARISEN since some developers will certainly get creative with [Multi-Writer Databases](#multi-writer-databases), while other applications don't require user authentication or an alternative to the server-based backends used within traditional web applications.
+
+#### The End Of Online Censorship
+The dWeb ultimately puts an end to online censorship by putting users in control of their data, and putting application developers in control of application distribution, network address, domain names and dDNS records. To truly showcase the difference between dWeb and the World Wide Web as it pertains to censorship, I'd like to compare an example of a social network on the centralized web (Gab) with an example a social network on the dWeb (dSocial).
+
+Many centralized social networks claim to be "censorship-resistant" because their founders and the companies that control the data produced by these applications claim that they'll never use their control to censor the users who curate data on these platforms. This is misleading because many outside tentacles exist that have a higher level of control over these applications than the actual founders do. When the domain name gab.com was taken offline, it wasn't due to the actions of their founders. It was because of the centralized company in charge of domain administration for `.com` TLDs who, by design, will always have control of "gab.com," as well as the leftwing hosting providers who jumped into "save the world" mode and subsequently shut down gab.com's servers. While Gab and other similar networks should be recognized for their efforts to create a "safe space" for users wanting to voice their opinions, users of these applications should also be aware that these platforms cannot truly claim that they're censorship-resistant since their entire platform can be taken offline at any time.
+
+**Centralized social networks like Gab can be completely censored and taken offline in the following ways:**
+
+-The Internet Corporation for Assigned Names and Numbers (ICANN) administers the assignment of top-level names and addresses [STALL14] (such as gab.com) through domain registrars that they approve. At any time, ICANN or one of these centralized domain registrars can adjust their policies in order to seize a domain name. Rogue governments or judges looking to make a political statement (see Judge Ed Sullivan in US vs Flynn) also have the ability to order the seizure of domain names through ICANN or US-based domain registrars, which may point to websites that go against their political views or the views of their affiliates.
+
+-Centralized hosting companies that operate within centralized data centers are where the data related to these centralized social networks is stored, as well as the files related to the web application itself. Without these centralized hosting providers, there would be no way to access the website or web application. As was seen in the gab.com debacle, hosting companies were targeted by leftists and were subsequently pressured to cancel their hosting agreements with Gab. This forced Gab to find a new hosting provider. Like top-level domains, rogue political factions can seize control of these servers and take the application files and data offline.
+
+-Hackers can organize attacks aimed at taking these platforms offline, in the process gaining temporary control of accounts and deleting or editing (censoring) specific content.
+
+-The owners of these application can have a change in views (see Drudge Report) and can all of a sudden elect to censor the views of their users, since they have central control over the data itself. This forces users to start their entire digital existence from scratch. In an age when businesses, personalities and regular everyday people store their entire digital existence on these networks, it's important that users are ensured by an application's source code that a sudden change in operation simply isn't possible without their say. With centralized applications like social networks, this will never be possible.
+
+**dSocial lacks these central points of failure in the following ways:**
+
+-dSocial uses [Decentralized Network Addressing](#decentralized-network-addressing), including its own decentralized domain name (`dsocial.dcom`) that is not administered by anyone, and uses [ARISEN](#arisen) and [dDNS](#ddns) as a means for storing its domain name records. dSocial can be accessed over the dWeb, via `dweb://dsocial.dcom`.
+
+-dSocial's dWeb-based application files are stored within a dDrive and distributed amongst its users, rather than being hosted via "centralized server farms." dSocial's data that derives from actions is hosted across the nodes that make up ARISEN, while each post or comment's media files uploaded to the platform are packed within their own individual dDrives and distributed and stored amongst the viewers of these posts.
+
+-dSocial's application code is distributed in a dDrive, which means that it can only be edited by the original creator of the dDrive, who also happens to be the holder of the private key related to the dDrive. The private key, through Elliptic Curve Multiplication (one-way function), creates the dDrive's public key which is then used to generate the dWeb network address, which is a "BLAKE2B" hash (one way hash) of the public key [RICE19A]. A dWeb network address is only discoverable by those who know it. Once discovered, a peer can then find a peer or peers from which they can download the dDrive. At that point, the peer or peers will have the dDrive's public key, which can then be used to verify the integrity of the data. The private key, which is needed to make edits to the state of the dDrive, is never exposed. And it is a well-established scientific fact, backed by a strong mathematical foundation, that the public key derivation process (`K=k*G`) cannot be reversed [WOOD19, AMTP17, ECEM19]. In other words, the public key cannot be used to calculate the private key.
+
+**NOTE:** In the above equation, `K` is the public key, `k` is a randomly generated number in the form of a private key and `G` is a pre-determined generator point on the elliptic curve.
+
+With that said, hackers would be unable to edit or exploit the application code within a dDrive without the private key. Also, even if dSocial's developers (who have the private key of its dDrive and control the private keys associated with the ARISEN account that deployed its smart contract) were to edit the application code within the dDrive or the smart contract code on ARISEN, several things are certain:
+
+-1. Developers, regardless of the code they write, cannot change how the dWeb works. As explained in [User-Controlled Data](#user-controlled-data), users control their data, including the data they submit to applications. An application is simply pulling data from its on-chain datastore. It's not up to the application which data is allowed and which data is not. In other words, since dSocial uses ARISEN for user authentication and as a datastore, developers have to let ANY ARISEN account log in to their application and users data related to their use of dSocial's smart contract will certainly accompany them.
+
+-2. The code is open source (all dDrives are open source by nature) and can be forked by other developers with a fresh set of keys. Since all of dSocial's data is openly available on ARISEN, the new clone would automatically pull all of dSocial's data, and dSocial's users would be able to log in and use the same system once again. Apps on the dWeb can be forked and re-launched within seconds using [dBrowser](#http://dbrowser.com).
+
+While I can promise that Peeps will never change its position as it pertains to censorship, you don't have to take my word for it. Users of dSocial are in control of their own data and the application is open to the community. So much in fact, that if the community wanted to overthrow the dSocial application, while keeping their data and accounts in tact, they could do just that by launching an all new version of the application that would still use ARISEN as its immutable data source. This way, users would retain their data and everything pertaining to their digital existence on dSocial, while a dSocial alternative (fork) is simply dSocial reincarnated within a new dDrive and a new dWeb network address.
+
+This is possible because dSocial is built on a truly decentralized foundation where users are programmatically in control, as opposed to developers, hosting companies, domain registrars and abusive bureaucratic leaders who are controlled and incentivised by special interest groups that hate freedom. Therefore, apps built on the dWeb cannot censor their users thanks to the dWeb's truly censorship-resistance foundation.
+
+#### DDOS and Hacker-Resistant
+Since files for websites and web applications are contained within a dDrive, dWeb-based desktop and mobile applications are downloaded directly to a user's device, with their functionality taking place on the end-user's device, eliminating the DDOS threat to the application itself. While some of the application's code (smart contract) is stored externally on ARISEN's blockchain, and blockchain networks can be the target of sophisticated DOS-style attacks, these type of DOS attacks will have very little effect, if any, on the dWeb and it's applications.
+
+It an individual node on ARISEN is hacked, it's likely this was not due to the actual ARISEN software but rather, was more likely due to an ARISEN node that was not properly secured. In any event, it wouldn't matter if a node, even a block producer node for that matter, was compromised. This is because a consensus of 15/21 block producers are needed to make changes to on-chain code (smart contracts). Also, a hacker would be unable to affect the operations of the network, nor would they be able to halt any of the network's smart contracts. The only thing a hacker exploiting an individual ARISEN node could do is steal the private keys from that particular node's user (this would be difficult since the keys are encrypted, but still possible). If a hacker attempts to propagate fake transactions to other nodes actively participating on ARISEN, nodes will notice these transactions are fake, block the node sending out these fake transactions and as a result, the transactions will never be validated or stored on the network's ledger.
+
+To be able to track the origins of transactions, or interfere with propagation, an attacker would have to control a significant percentage of ARISEN's nodes and at least 15 of the 21 block producer positions. Simply put, it would never happen and if it did, the community would immediately vote out this sort of attack and replace the compromised block producers with new ones.
+
+As for peers that share websites and web applications amongst each other via the dWeb, it's important to understand that files being shared can only be edited by the creator of the dDrive, and that those downloading a dDrive from peers on the dWeb are downloading a binary representation of the files and not the files themselves. A peer is only broadcasting the binary data in the form of a dDatabase, which in turn makes up the "file system" of the dDrive, which is then fragmented across the peers that share it (seeders) to those who request to download it.
+
+As far as dWeb's DHT is concerned, we have implemented a number of Kademilia extensions to enable a secure key-based routing protocol. Kademilia also protects against the only known attacks against DHTs, specifically:
+-Sybil Attacks - Where a user generates an extreme number of DHT nodes to flood the network; and
+-Eclipse Attacks - Where an attacker attempts to isolate a DHT node or a set of DHT nodes in the network graph, by ensuring that all outbound connections reach malicious nodes.
+
+Last but not least, dWeb's use of ARISEN's [Universal Authentication Layer](#universal-authentication-layer) and public key cryptography makes it next to impossible to gain access to a user's account.
+
+While the dWeb is not perfect, it is also not riddled with the same issues as the World Wide Wide and, as a result, it is a much better and safter alternative. By putting users in control, rather than centralized tech companies, it should come as no surprise that the dWeb network and the applications built on top of it, are much more secure when compared to the World Wide Web and the applications built on top of it.
+
+#### A Decentralized Economy
+For developers and users alike, perhaps the greatest advantage of them all, when teamed with diminishing infrastructure costs, is app developers having the ability to tightly integrate decentralized payments and currencies within their applications. This simply isn't possible with fiat money like it is with decentralized digital currencies.
+
+Using dSocial as an example once more, ARISEN's RIX currency and dSocial's LIKE currency are highly integrated into the dSocial app, where users can earn RIX and LIKE for their posts and comments. While at the same time, these same users can spend their earnings via a dWeb-based ridesharing app (such as dRide) or a decentralized marketplace (such as dBuy). This has the potential to create a decentralized economy where fiat money literally isn't needed.
+
+Continuing the example, dSocial could be configured to take a small fee for each post or comment upvote, or dRide could be configured to take a small fee for each ride (both easily accomplished via an ARISEN contract). The small fees would help the developers of the apps further development and market their applications. More importantly, in the case of dRide, the developers would have little to no infrastructure costs and as a result, would be able to pay their driver's more and provide rides for less.
+
+This equates to perhaps the greatest advantage of all. If you didn't read that correctly, read this: dWeb-based apps can literally compete with their centralized competitors, which wouldn't be possible on the centralized web thanks to Google, Facebook, Amazon, Microsoft and other major tech companies who receive massive discounts on infrastructure. Sadly, while trying to compete with these companies, you would probably be buying your infrastructure directly from them (Google Cloud, AWS, Microsoft Azure, just to name a few).
+
+That's correct, with the dWeb developers can dream again. Even better, they can compete again and the dWeb's users reap the benefits in the process (cheaper rides, etc.).
+
+## Conclusion
+The dWeb is a web where both users and developers benefit one another, and in ways the World Wide Web could never facilitate. We live in interesting times, where it seems like the "golden age of information" is coming to an end, but it's far from over if We The People have anything to say about it. Like those in 1775, we must maintain our independent spirit and, above all, we must maintain our consciousness. The revolution is consciousness, and as we awaken from being slaves who have long been placed under a hypnosis of freedom and liberty, we are now starting to realize that those freedoms, as well as our liberties, have been eroded to a point where they remain barely intact.
+
+Our freedom of speech is one of our most important rights as ratified by our founders. Yet it's no longer a right so much as it is a scarce privilege on the World Wide Web. Big tech companies, through their partnerships with China, have waged war on those who choose to expose their anti-American propaganda being spread throughout the web. From tweets to YouTube videos, you either agree with them or you're fact-checked into oblivion, and banned not long thereafter. It's a false matrix that is now riddled with censorship and controlled by the likes of communist neo-fascist dictators like Mark Zuckerberg and Jack Dorsey. You could search Google to confirm what I'm telling you, but they have already scrubbed those sources months ago, sadly.
+
+The Rockefellers didn't want the masses to have free and fair access to the web and they have certainly found a way to finally restrict it. Though what they never counted on were a couple of inmates who were willing to defy them against all odds, and risk their own lives and freedom in a journey to build and launch an alternative web where people and companies alike, could have their online freedoms and liberties back at a time when they're needed most. And as much as they would like to shut it down, and as I have thoroughly pointed out in this paper, it simply isn't possible.
+
+This web I write about isn't a dream or a scheme, it's a reality. And expanding that web will be one of the most important fights for freedom since a few patriots decided to take up arms on a cold night in 1775 and fight for their families, their future and most importantly, their freedom.
+
+You too can join the fight and become a part of the dWeb revolution yourself, by simply downloading [dBrowser](#http://dbrowser.com). While this paper may seem like a lot, I can assure you, just as I'm writing this with blistered fingers, that we're just getting started. There is so much to do and so much to build. I hope our work motivates you to join the cause. I hope it liberates you. I hope it awakens you.
+
+Fight on!
