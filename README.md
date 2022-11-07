@@ -20,8 +20,9 @@
 - [BitDrives](#bitdrives)
 - [SmartChains](#smartchains)
 - [BitNames](#bitnames)
-- [Identity](#identity) // Under development
-- [Currency](#currency) // Under development
+- [BitID](#bitid) // Under development
+- [BitCurrency](#bitcurrency) // Under development
+- [BitOrgs](#bitorgs) // Coming soon
 - [BitTables](#bittables) // Coming soon
 
 ## Manifesto
@@ -1306,18 +1307,18 @@ BitNames is decentralized, blockchainless, serverless, and globally elastic: in 
 ![Figure BN-2: dWeb Decentralized Domain Name System](/images/Figure-BN-2-Web4-Decentralized-Domain-Name-System.svg)
 
 
-## Identity
+## BitID
 **Under Development**
 ### Horizon
 **Under Development**
 
-## Currency
+## BitMoney
 **Under Development**
 ### BitcoinIQ
 
 **Under Development**
 
-## Organizations
+## BitOrgs
 
 **Under Development**
 
