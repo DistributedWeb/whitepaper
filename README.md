@@ -1258,13 +1258,14 @@ Domain data that is stored within a dDNS Registry must conform to the following 
 
 ```
 {
-  dateRegistered: <timestamp>, // when was this dTLD registered?
-  owners: [], // addresses of owner(s) DID document(s)
-  otherData: {} // an object for storing futher data.
+  "dateRegistered": <timestamp>, // when was this dTLD registered?
+  "owners": [], // addresses of owner(s) DID document(s)
+  "otherData": {} // an object for storing futher data.
 }
 ```
 
 ### Decentralized Domains
+dDNS Registries should allow users to register domains surrounding active dTLDs that have been registered via the registry. Domain names can include anything from text and numbers to emojis and other UniCode-compliant syntax.
 
 #### Domain Name Data Model
 Domain data that is stored within a dDNS Registry must conform to the following Data Model:
@@ -1275,9 +1276,9 @@ Domain data that is stored within a dDNS Registry must conform to the following 
 
 ```
 {
-  dateRegistered: <timestamp>, // when was this domain registered?
-  owners: [], // addresses of owner(s) DID document(s)
-  otherData: {} // an object for storing futher data.
+  "dateRegistered": <timestamp>, // when was this domain registered?
+  "owners": [], // addresses of owner(s) DID document(s)
+  "otherData": {} // an object for storing futher data.
 }
 ```
 
@@ -1313,12 +1314,15 @@ Resource Record data that is stored within a dDNS Registry, must utilize the fol
 
 ```
 {
-  rrType: <rrType>, // example: CNAME
-  hash: <hash>, // what dWeb address does this record point to?
-  createdAt: <timestamp>, // timestamp of when this record was originally created.
-  lastModified: <timestamp>, // timestamp of when this record was last modified.
-  publicKey: <publicKeyOfRecordAuthor> // public key of the record's creator. Must be in the `owners` array within the Domain data.
-  otherData: {} // an object for storing futher data.
+  "rrType": <rrType>, // example: CNAME
+  "rdata": <hash>, // what dWeb address does this record point to?
+  "createdAt": <timestamp>, // timestamp of when this record was originally created.
+  "lastModified": <timestamp>, // timestamp of when this record was last modified.
+  "publicKey": <publicKeyOfRecordAuthor> // public key of the record's creator. Must be in the `owners` array within the Domain data.
+  "class": <recordClass>,
+  "ttl": <ttl>,
+  "description": "my website",
+  "otherData": {} // an object for storing futher data.
 }
 ```
 
