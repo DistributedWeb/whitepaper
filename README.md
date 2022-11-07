@@ -23,6 +23,7 @@
 - [dDNS](#ddns)
 - [dIdentity](#didentity) // Under development
 - [dCash](#dcash) // Under development
+- [dTokens](#dtokens) // Coming soon
 - [dOrganizations](#dorganizations) // Coming soon
 - [App-Specific DHTs](#app-specific-dhts) // Coming soon
 
