@@ -1239,75 +1239,8 @@ As will be seen in the final sections of this paper, dMachines can be used to bu
 - Machine learning networks.
 - IoT networks.
 
-## dDNS
-dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning the registration of Decentralized Top-Level Domains (dTLDs) and the registration of dTLD-based domain names are decentralized, where records are distributed across the computers of peers on the network of a dDNS registry. A dDNS registry is a network of peers that share data regarding dTLDs, registered domains and their associated domain name records. Unlike traditional DNS, dWeb's dDNS does not utilize nameservers since the dWeb is completely serverless. DNS records are stored in distributed databases, whether they be a dDatabase, a dMachine's indexLog or a DHT (if a domain registry is built around an [app-specific DHT](#app-specific-dhts)). Data related toa dDNS registry are resolved using resolvers that simply query the distributed database. We have created a reference implementation known as the [Brane Resolver](#brane-resolver) which showcases how domains can be resolved. The dWeb's dDNS model is depicted in Figure BN-2.
-
-#### dWeb Top-Level Internet Domains (dTLDs)
-
-dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domains) that can be registered by users. dTLDs can include anything from text to emojis.
-
-##### Registering dTLDs
-
-Custom dTLDs (e.g., “.something”) can be created via Registrar Machines so that endorsers of the registrar can register names using the custom suffix. On BitNames, once a dTLD is created, domains can be registered almost instantaneously using the new dTLD (e.g., “domain.something”). Creating dTLDs is free on BitNames.
-
-##### Registering Domain Names
-
-Registering domain names on BitNames is also free. Each domain is associated with a public key so that the creation and modification of a domain’s dDNS records can be validated against a cryptographic signature.
-
-#### Brane Resolver
-
-The Brane Resolver, as shown in Figure BN-2, is able to decipher which Registrar Machine a domain request should be sent to. Brane deciphers these requests via a ‘Registrar Index’ compiled by Brane’s elected DAO via the Brane dMachine. The ‘Registrar Index’ contains a “rolling list” of dTLDs published and operated by various Registrars.
-
-##### Brane Resolving Process
-
-1. A User Program asks the Brane Resolver about “domain.x” and a record type.
-2. The Brane Resolver queries the Brane dDatabase for “.x” which returns the public key of BitName’s Index Log.
-3. The Brane Resolver then queries the BitName dDatabase using the UML -`bit://bitnames.x/domain.x/root/BD`, which returns the `root` BD record for `domain.x`. Root Records are considered `wildcard records` on the dWeb. The returned record has the following envelope:
-
-```
-{
-    domain: “domain.x”,
-    address: “<key>”
-}
-```
-
-#### Resource Record Types
-
-A dWeb-compliant dDNS utilizes several “Resource Record” types for different types of network entities, including the following:
-
-| Record Type | Description |
-| :--- | :--- |
-| BD | dDrive record for identifying a dDrive resource. |
-| DX | Device address. |
-| RM | Registrar machine address. |
-| U | Record for identifying any UniChain-based structure. |
-| SC | Record for identifying a dMachine |
-| BT | Record for identifying a dDatabase |
-| MM | Record for identifying a Mail Machine. |
-| TXT | Way of putting text comments in the DNS database for a domain. |
-| TW | Record for identifying a tower. |
-| CNAME | Canonical name. Specifies an alias for a BD record. |
-| SRV | Service record for identifying a service. |
-| PX | Peer address. |
-
-For more information on BitNames, read the documentation located [here](https://dw3b.network/bitnames). To read more about the dWeb's Decentralized Domain Name System (dDNS) specification, please read BRC-2 located [here](https://docs.dw3b.network/brcs/2).
-
-### BitNames
-
-BitNames is the dWeb’s reference implementation of dWeb's dDNS specification. BitNames is also dWeb’s first decentralized domain system (dDNS). BitNames currently allows users to register names using more than 600 decentralized top-level domains (dTLDs), such as .bcom, .dweb, .x, .iq, and others.
-
-Each domain name that’s registered via BitNames has a corresponding private key that proves ownership. All DNS record modifications must be signed with the corresponding domain’s private key so that domain name ownership can be proven. Every domain name’s public key is published at the time of registration and cannot be modified, since all DNS record modification functions check the digital signature against this stored public key. This check ensures that only the domain owner can modify the domain’s underlying records.
-
-BitNames is decentralized, blockchainless, serverless, and globally elastic: in other words, no more name servers or propagation delays – the entire BitNames system functions instantaneously. Since the dDatabase beneath BitName’s dMachine is globally distributed, extremely redundant, and seeded across a multitude of peers, it can be utilized for any and all DNS queries.
-
-![Figure BN-0: Country Code dTLDs Part 1 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-1-of-2.svg)
-
-![Figure BN-0: Country Code dTLDs Part 2 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-2-of-2.svg)
-
-![Figure BN-1: Generic dTLDs](/images/Figure-BN-1-Generic-dTLDs.svg)
-
-![Figure BN-2: dWeb Decentralized Domain Name System](/images/Figure-BN-2-Web4-Decentralized-Domain-Name-System.svg)
-
+## dDNS 
+**Under Development**
 
 ## dIdentity
 **Under Development**
@@ -1322,6 +1255,9 @@ BitNames is decentralized, blockchainless, serverless, and globally elastic: in 
 **Under Development**
 
 ## dOrganizations
+**Under Development**
+
+## App-Specific DHTs
 **Under Development**
 
 # Conclusion
