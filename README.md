@@ -1248,7 +1248,7 @@ dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning 
 
 dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domains) that can be registered by users. dTLDs can include anything from text and numbers to emojis and other UniCode-compliant syntax. This specification does not specify whether dDNS registries should have an economic model or the method for which dTLDs are acquired (i.e. auction).
 
-#### 
+#### dTLD Data Model
 
 ### Decentralized Domains
 
@@ -1276,7 +1276,22 @@ A dWeb-compliant dDNS utilizes several “Resource Record” types for different
 
 For more information on BitNames, read the documentation located [here](https://dw3b.network/bitnames). To read more about the dWeb's Decentralized Domain Name System (dDNS) specification, please read BRC-2 located [here](https://docs.dw3b.network/brcs/2).
 
-#### Resource Record Data Structure
+#### Resource Record Data Model
+Resource Record data that is stored within a dDNS Registry, must utilize the following Data Model:
+
+- key - ```/rr/<domain>```
+- value:
+
+
+```
+{
+  rrType: <rrType>, // example: CNAME
+  hash: <hash>, // what dWeb address does this record point to?
+  createdAt: <timestamp>, // timestamp of when this record was originally created.
+  lastModified: <timestamp>, // timestamp of when this record was last modified.
+  publicKey: <publicKeyOfCreator> // public key of the record's creator.
+}
+```
 
 
 ### Resolving Records
