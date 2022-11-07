@@ -12,6 +12,18 @@
 - **v4.0** - February 8th, 2022
 - **v5.0** - November 7th, 2022
 
+## Core Concepts
+- [dWeb Networking](#dweb-networking)
+- [UniChains](#unichains)
+- [MultiChains](#multichains)
+- [BitTrees](#bittrees)
+- [BitDrives](#bitdrives)
+- [SmartChains](#smartchains)
+- [BitNames](#bitnames)
+- [Identity](#identity) // Under development
+- [Currency](#currency) // Under development
+- [BitTables](#bittables) // Coming soon
+
 ## Manifesto
 
 **By:** Neo Thawreww 
@@ -1223,25 +1235,7 @@ As will be seen in the final sections of this paper, SmartChains can be used to 
 - Machine learning networks.
 - IoT networks.
 
-This paper will conclude by showcasing the BitNames and Horizon SmartChains, along with the dWeb’s first currency, BitcoinIQ. All three provide critical distributed services as it relates to the dWeb ecosystem: decentralized domain names, global identity, and payments.
-
-## BitNames
-
-BitNames is the dWeb’s first web application and the first SmartChain based smart contract deployed. BitNames is also dWeb’s first decentralized domain system (dDNS). BitNames currently allows users to register names using more than 600 decentralized top-level domains (dTLDs), such as .bcom, .dweb, .x, .iq, and others.
-
-Each domain name that’s registered via BitNames has a corresponding private key that proves ownership. All DNS record modifications must be signed with the corresponding domain’s private key so that domain name ownership can be proven. Every domain name’s public key is published at the time of registration and cannot be modified, since all DNS record modification functions check the digital signature against this stored public key. This check ensures that only the domain owner can modify the domain’s underlying records.
-
-BitNames is decentralized, blockchainless, serverless, and globally elastic: in other words, no more name servers or propagation delays – the entire BitNames system functions instantaneously. Since the BitTree beneath BitName’s SmartChain is globally distributed, extremely redundant, and seeded across a multitude of peers, it can be utilized for any and all DNS queries.
-
-![Figure BN-0: Country Code dTLDs Part 1 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-1-of-2.svg)
-
-![Figure BN-0: Country Code dTLDs Part 2 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-2-of-2.svg)
-
-![Figure BN-1: Generic dTLDs](/images/Figure-BN-1-Generic-dTLDs.svg)
-
-![Figure BN-2: dWeb Decentralized Domain Name System](/images/Figure-BN-2-Web4-Decentralized-Domain-Name-System.svg)
-
-### dWeb Domain Name System
+## Decentralized Domain Name System
 
 The specification for dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning the registration of Decentralized Top-Level Domains (dTLDs) and the registration of dTLD-based domain names is decentralized. It also means that the underlying DNS database is decentralized. dWeb's dDNS does not utilize nameservers, since the dWeb is completely serverless. DNS records are stored in the index log related to “Registrar Machines” and are resolved by the [Brane Resolver](#brane-resolver). The dWeb's dDNS model is depicted in Figure BN-2.
 
@@ -1295,100 +1289,37 @@ A dWeb-compliant dDNS utilizes several “Resource Record” types for different
 
 For more information on BitNames, read the documentation located [here](https://dw3b.network/bitnames). To read more about the dWeb's Decentralized Domain Name System (dDNS) specification, please read BRC-2 located [here](https://docs.dw3b.network/brcs/2).
 
-## Horizon
+### BitNames
 
-The Horizon Smart Chain is used as a global identity and payment network that can be used by SmartChain based programs and dWeb-based applications. Horizon publicizes Decentralized Identity Documents (DIDs) within Horizon’s state, helping form a global identity network. Applications that integrate with Horizon enable their users to utilize passwordless DID-based authentication across multiple devices. While SmartChains provide decentralized data agency for a single application, Horizon provides collective agency for the applications that utilize its identity system. Horizon also features a currency known as “BitCoinIQ” (BIQ), as well as an elected governance that oversees Horizon’s operations on behalf of the community. Horizon is also a Decentralized Autonomous Organization (DAO).
+BitNames is the dWeb’s reference implementation of dWeb's dDNS specification. BitNames is also dWeb’s first decentralized domain system (dDNS). BitNames currently allows users to register names using more than 600 decentralized top-level domains (dTLDs), such as .bcom, .dweb, .x, .iq, and others.
 
-### dWeb Identity and Authentication
+Each domain name that’s registered via BitNames has a corresponding private key that proves ownership. All DNS record modifications must be signed with the corresponding domain’s private key so that domain name ownership can be proven. Every domain name’s public key is published at the time of registration and cannot be modified, since all DNS record modification functions check the digital signature against this stored public key. This check ensures that only the domain owner can modify the domain’s underlying records.
 
-The differences between Web3 authentication and dWeb authentication are significant, as shown in Figure H-0. Users of Web3 based applications write their data to massive multi-writer data structures such as blockchains where they must utilize a digital signature to prove their identity to all participants of the data structure. This process is expensive and requires complex applications such as “Authenticators” and “Wallets,” in addition to “Signature Providers,” “Signing Request Protocols,” and other implementations that degrade and otherwise complicate user experience. It seems as though Web3 users have to issue a digital signature for simply blinking, or at least it certainly seems that way.
+BitNames is decentralized, blockchainless, serverless, and globally elastic: in other words, no more name servers or propagation delays – the entire BitNames system functions instantaneously. Since the BitTree beneath BitName’s SmartChain is globally distributed, extremely redundant, and seeded across a multitude of peers, it can be utilized for any and all DNS queries.
 
-![Figure H-0](/images/Figure-H-0.svg)
+![Figure BN-0: Country Code dTLDs Part 1 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-1-of-2.svg)
 
-dWeb entities utilize single-writer data structures to which they write and sign application-related data within their own individual data structures on a per-block basis. Ranges of this data can then be streamed to peers that want or need to consume it. Applications “collect” these individual structures and compile them into multi-writer databases such as MultiChains or cooperative state machines such as SmartChains. At a basic level, all that a dWeb user needs to interact with an application is write access to the single-writer data structures that these applications monitor and stream into larger multi-writer data structures.
+![Figure BN-0: Country Code dTLDs Part 2 of 2](/images/Figure-BN-0-Coutry-Code-dTLDs-Part-2-of-2.svg)
 
-dWeb-compliant applications do not require authenticators such as MetaMask. Instead, dWeb-based applications are able to utilize a JavaScript API called [ChainStore](#chainstore-management-and-replication) that creates a local ChainStore instance on the end user’s device. ChainStore, as described earlier in this paper, is an API for creating and managing UniChain based data structures. Developers can configure ChainStore to store a UniChain’s secret keys wherever they want, including secure chips such as Apple’s Secure Enclave. Anytime a user writes to a UniChain based data structure, ChainStore creates a root hash and signs the hash before appending a block to the UniChain. Chainstore manages this digital signing process, which is completely hidden from the user. ChainStore also allows developers to utilize a `writable()` method, which returns true if a user has write access to a particular data structure.
+![Figure BN-1: Generic dTLDs](/images/Figure-BN-1-Generic-dTLDs.svg)
 
-**Chainstore plays a key role in how users are authenticated on the dWeb and allows for a completely passwordless experience when used in conjunction with systems like Horizon.**
+![Figure BN-2: dWeb Decentralized Domain Name System](/images/Figure-BN-2-Web4-Decentralized-Domain-Name-System.svg)
 
-#### DID Documents and Horizon’s Global User Registry
 
-Horizon’s SmartChain publishes a `signup()` action in its smart contract that accepts four parameters:
+## Identity
+**Under Development**
+### Horizon
+**Under Development**
 
-- A username.
-- The public key of a Horizon DID Document.
-- A signature using the DID’s secret key.
-- A random nonce used in the signature process.
-
-Horizon stores this data on chain at `/users/${ username }` with the following value structure:
-
-```
-{
-    username,
-    DIDKey,
-    signature
-}
-```
-
-The `signup()` action allows for a user and the public key of their DID to be queried. Per [DIDs 1.0](https://www.w3.org/TR/did-core/): “Decentralized identifiers (DIDs) are a new type of identifier that enables verifiable, decentralized digital identity. A DID identifies any subject (e.g., a person, organization, thing, data model, abstract entity, machine, robot, etc.) that the controller of the DID decides that it identifies.”
-
-#### DID Based Authentication
-
-Horizon provides a [JavaScript API](https://docs.dw3b.network/horizon/apis/javascript) that allows applications to generate Horizon compliant DIDs using the ChainStore interface. Horizon’s API can also be utilized for managing DIDs via ChainStore. A Horizon DID is simply a BitTree that stores DID related data using a DID compliant path syntax:
-
-`did:horizon:<key-of-did>/device/deviceName`
-
-In this way, a DID could be queried for specific data, such as a device, and would return the specific portion of the DID thanks to BitTree’s versatile querying API. DIDs are UniChains and are therefore distributed like any other dWeb-based data structure using BIT protocol. This attribute allows an application to simply ask a user for their username and query the provided username on Horizon. If the username exists, Horizon will return the user’s DID key and ChainStore will attempt to retrieve the DID locally.
-
-If the following conditions are true, a user is considered authenticated:
-
-- The DID is local.
-- The DID is writable.
-- The DID contains the key of the oplog that is a known input in its SmartChain.
-- The oplog is writable.
-
-Once authenticated, a user can begin using the application, which means executing smart contract-based actions and writing the operation results to their oplogs.
-
-#### System Identity and Cross-System Authentication
-
-In the event that a user does not have write-access to a DID, it could be that the DID was created on a different device or system. Horizon’s JavaScript API enables a device to be assigned a dWeb address and announced on a dWeb-compliant DHT, which allows other devices to send it protocol messages. The feature can be helpful, for instance, when one device wants to give another device write-access to a DID document and oplogs. As previously discussed, this functionality is made possible by ChainStore and the DUCKS protocol.
-
-Below is an example of how this type of functionality would work with Socialx:
-
-1. Bob attempts to access Socialx from a new device.
-2. Socialx looks for a DID document on Bob’s new phone but is unable to find one, so it asks Bob if he wants to Signup (create a new DID) or log in. Bob clicks log in.
-3. Bob is asked to enter a username so he enters “bob.”
-4. Socialx performs a lookup on Horizon for “bob” (bit://horizon.x/user/bob) and returns Bob’s DID key (public key).
-5. Socialx initializes BitSwarm, performs a lookup for the DID’s public key on a dWeb-compliant DHT, and then connects with the DID’s swarm and downloads the DID.
-6. Socialx performs a lookup in the DID for @bob’s devices and finds Bob’s desktop and his watch. An `init` DUCKS protocol message is sent to the dWeb addresses for both Bob’s desktop and his watch.
-7. Since Socialx’s apps are programmed to listen for DUCKS messages, upon receiving the `init` message, both devices respond with notifications. (e.g., “You have a sync request.”)
-8. Upon clicking the notification on his desktop, Bob is told that a remote device wants access to his identity. He clicks “accept,” which sends a “verify” DUCKS protocol message back to Bob’s phone. Bob’s desktop then shows a 6-digit verification code.
-9. Upon receiving the “verify” message, Socialx’s mobile app shows a new screen prompting Bob to enter the verification code from his desktop. Bob enters the code shown on his desktop and clicks “verify.” This action sends a “proof” message to Bob’s desktop with the entered code.
-10. If the code is correct, Bob’s desktop sends an “access” message to Bob’s phone with the secret keys Bob asked for in his `init` message.
-11. Bob’s phone now has write-access to his DID and his oplog for Socialx’s SmartChain. Bob’s phone generates a new dWeb network address, announces it on a dWeb-compliant DHT and stores the new device information in Bob’s DID. Bob is now logged in.
-12. In the future, Socialx will locate Bob’s DID on his mobile phone, along with his oplog, and will automatically log him in so long as he has the secret key to these data structures. If multiple DIDs and oplogs exist on the same device, Socialx will allow end users to choose which DID they want to log in with.
-
-Horizon’s global identity system allows developers to focus on areas other than user authentication, especially given that DID-based authentication will soon become a standard feature in web applications. Users should control their identity and user authentication should be painless; Horizon’s global identity system satisfies both of these conditions.
-
+## Currency
+**Under Development**
 ### BitcoinIQ
 
-BitcoinIQ is the first “Hypercurrency” and Horizon’s native on-chain currency. Hypercurrencies can be considered Cryptocurrency 2.0 and get their name from their extreme chain-to-chain activity.
+**Under Development**
 
-Hypercurrencies technically exist natively on a single chain, but the data and proofs associated with their movements are stored within multiple unrelated chains. Hypercurrencies are hyperactive money and Horizon’s SmartChain has the capability to support the world’s transactions.
+## Organizations
 
-#### High Transaction Throughput
-
-Thanks to SmartChain technology, Horizon’s transaction speeds exceed those of any blockchain, and by a wide margin. This transaction speed ensures that BIQ can be used as dWeb's native currency from anywhere in the world, capable of supporting billions of transactions per second.
-
-#### Cross-Chain Currency Swaps
-
-BIQ and other future Hypercurrencies can be exchanged on a peer-to-peer basis by employing [Cross-Machine Execution](#cross-machine-execution). Decentralized currency exchanges and banking systems can develop smart contracts that allow end users to execute actions on multiple unrelated chains (e.g., Bob executes the `sendBIQ` action on Horizon, while Alice executes the `sendBIQ` action on the BIQ chain). This attribute allows two different currencies on two different chains to switch between two different users.
-
-BitcoinIQ has many other use cases which are discussed in more detail [here](https://dw3b.network/bitcoiniq).
-
-### Governance
-
-Horizon utilizes a built-in governance and election system that allows users to have a say in network-based decisions ranging from contract updates to fraud reversals. Elected governance members are Horizon’s executors, creating decentralized consensus around how state is applied from Horizon’s oplog inputs. Preventing fraud is another advantage of hypercurrency payments, among many more that are outside the scope of this paper.
+**Under Development**
 
 # Conclusion
 
