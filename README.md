@@ -134,7 +134,7 @@ This paper does not intend to explain the inner workings of Kademlia DHT. Those 
 **Coming Soon**
 
 ### UniChains
-A UniChain is a single-writer append-only ledger (SWL) that is designed to be exchanged between participants of a peer-to-peer network, without the risk of peers, other than the creator, altering its overall state. Every UniChain has a key-pair in which the private key holder is the only entity that can append data to the ledger. Entities that possess the public key can validate the authenticity of data within the ledger. Together, these traits make a UniChain a trustless distributed data structure.
+A UniChain is a reference implementation of a single-writer append-only ledger (SWL) that is designed to be exchanged between participants of a peer-to-peer network, without the risk of peers, other than the creator, altering its overall state. Every UniChain has a key-pair in which the private key holder is the only entity that can append data to the ledger. Entities that possess the public key can validate the authenticity of data within the ledger. Together, these traits make a UniChain a trustless distributed data structure.
 
 From a computer science perspective, UniChains are binary append-only data structures that can be streamed between multiple network participants. The contents of these data structures are cryptographically hashed and signed. UniChains are identified internally by signed Merkle trees and are identified on the dWeb using a public key, which is discoverable using a chainID (dWeb network address) that is derived from the public key and stored within a dWeb-compliant DHT.
 
