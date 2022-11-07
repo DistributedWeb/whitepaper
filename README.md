@@ -1246,9 +1246,22 @@ dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning 
 
 ### Decentralized Top-Level Internet Domains (dTLDs)
 
-dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domains) that can be registered by users. dTLDs can include anything from text and numbers to emojis and other UniCode-compliant syntax. This specification does not specify whether dDNS registries should have an economic model or the method for which dTLDs are acquired (i.e. auction).
+dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domains) that can be registered by users. dTLDs can include anything from text and numbers to emojis and other UniCode-compliant syntax. This specification does not specify whether dDNS registries should have an economic model or the method for which dTLDs are acquired (i.e. auction). Any participant within the dDNS Registry should be able to register a domain with any dTLD, even though dTLDs are originally registered by a user.   
 
 #### dTLD Data Model
+Domain data that is stored within a dDNS Registry must conform to the following Data Model:
+
+- key - ```/domain/<domainName>```
+- value:
+
+
+```
+{
+  dateRegistered: <timestamp>, // when was this dTLD registered?
+  owners: [], // addresses of owner(s) DID document(s)
+  otherData: {} // an object for storing futher data.
+}
+```
 
 ### Decentralized Domains
 
@@ -1262,8 +1275,7 @@ Domain data that is stored within a dDNS Registry must conform to the following 
 ```
 {
   dateRegistered: <timestamp>, // when was this domain registered?
-  ownerDid: <didAddress>, // address of the owner's DID document
-  publicKey: <publicKeyOfOwner>, // public key of the domain's owner.
+  owners: [], // addresses of owner(s) DID document(s)
   otherData: {} // an object for storing futher data.
 }
 ```
@@ -1276,12 +1288,12 @@ A dWeb-compliant dDNS utilizes several “Resource Record” types for different
 
 | Record Type | Description |
 | :--- | :--- |
-| BD | dDrive record for identifying a dDrive resource. |
+| DD | dDrive record for identifying a dDrive resource. |
 | DX | Device address. |
 | RM | Registrar machine address. |
 | U | Record for identifying any UniChain-based structure. |
-| SC | Record for identifying a dMachine |
-| BT | Record for identifying a dDatabase |
+| DM | Record for identifying a dMachine |
+| DB | Record for identifying a dDatabase |
 | MM | Record for identifying a Mail Machine. |
 | TXT | Way of putting text comments in the DNS database for a domain. |
 | TW | Record for identifying a tower. |
@@ -1304,7 +1316,7 @@ Resource Record data that is stored within a dDNS Registry, must utilize the fol
   hash: <hash>, // what dWeb address does this record point to?
   createdAt: <timestamp>, // timestamp of when this record was originally created.
   lastModified: <timestamp>, // timestamp of when this record was last modified.
-  publicKey: <publicKeyOfCreator> // public key of the record's creator.
+  publicKey: <publicKeyOfRecordAuthor> // public key of the record's creator. Must be in the `owners` array within the Domain data.
   otherData: {} // an object for storing futher data.
 }
 ```
