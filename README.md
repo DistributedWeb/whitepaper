@@ -497,7 +497,10 @@ Entities that are writing to a MultiChain - in other words, entities that have a
 
 Instead of reprocessing each block from start to finish, the solution to the issue above is to pass the “remote views” of others to `linearize()` so that only minimal changes are needed to bring the remote view up to date. This solution improves user experience and allows application developers to utilize higher-level data abstractions on top of MultiChain, in turn enabling their their users to download the specific MultiChain data they consume rather than the entire MultiChain.
 
-## BitTrees
+## Databases
+**Coming Soon**
+
+### BitTrees
 
 A BitTree is a key-value store built on top of a UniChain and is compatible with anything that consumes UniChains, such as a MultiChain. A BitTree is simply a UniChain when all of the abstractions have been stripped away at the block level. BitTrees arrange data into a binary tree, which allows data to be located very quickly, even in data structures that contain billions (even trillions) of blocks. While the topic of binary trees is beyond the scope of this paper, it is important to note that they are utilized in many popular centralized database frameworks so that data can be easily indexed and located within underlying data structures. Binary trees are also used to arrange data within most DHTs.
 
@@ -515,7 +518,7 @@ Higher-level data structures built on top of a UniChain utilize a value schema, 
 
 BitTree makes this determination by traversing the underlying UniChain for every block where “value.key = the queried key.” In the previous figure, by block #4, three matches would have been returned for the key “bitweb.” If the “get()” method was used, BitTree would traverse the matches for “value.version” and pick the largest version number and return the “value.value” field. If the largest version number has a “value.deleted” Boolean that equates to true, “get()” would return “not found.” BitTree’s API streamlines application development by simplifying the process of interfacing with UniChain based data structures.
 
-### Indexing and Range Queries
+#### Indexing and Range Queries
 
 BitTree keys can be formatted so that they can be used for complex indexing and traversal of data. Keys can contain multiple indexes within the same keys. This formatting can be seen in Figure BT-3, in example (C), with the key “/posts/bob/01/22/22.” Complex indexing strategies may utilize multiple “puts” for the same data. For example, user Bob likes user Alice’s post on his favorite dWeb-based social network, and the underlying application produces the following data from this interaction:
 
@@ -573,7 +576,7 @@ This type of query would not be possible if Bob’s “like” had not been inde
 
 BitTree enables powerful range querying built on top of UniChain’s lightweight distributed architecture. dWeb applications are faster when compared to centralized and other decentralized applications due to the manner in which BitTree’s underlying data is sparsely replicated and therefore distributed.
 
-### Sparse BitTree Replication
+#### Sparse BitTree Replication
 
 As explained in [Sparse Downloading](#sparse-downloading), a UniChain can be sparsely shared among peers. Due to the underlying Merkle tree, a peer that is only interested in the data within a specific block of a UniChain need only possess that same block to verify the partial chain. This ability is made possible by the `want` BIT protocol message, which allows requestors to ask if the remote peer has a block or blocks that contain a specific byte or set of bytes, rather than asking for a specific block or block range.
 
@@ -581,7 +584,7 @@ For instance, requestors can easily ask peers of a social network’s BitTree if
 
 If every peer of a dWeb-based social network had to download its entire BitTree, it would significantly impact user experience, especially considering that a social network with billions of users could have trillions of blocks in its underlying MultiChain. Even though a BitTree’s binary tree would allow peers to quickly traverse trillions of blocks in mere seconds, it is much easier and far simpler for peers to ask a social network’s BitTree swarm for the data they need, preserving only those portions of data they utilize and consume. Range querying over keys allows entities to consume only the data they need, touching just a small subset of blocks in the underlying UniChain.
 
-### Collaborative BitTrees
+#### Collaborative BitTrees
 
 BitTrees are built on top of UniChains and are thus single-writer data structures, but they can be used with MultiChain filters to compile a multi-entity key-value store, as seen in Figures BT-1 and BT-2. These multi-entity key-value stores are referred to as “Collaborative BitTrees.”
 
@@ -593,7 +596,7 @@ BitTrees are built on top of UniChains and are thus single-writer data structure
 
 Whether the original data derives from a UniChain or a higher-level abstraction such as a BitTree, a MultiChain’s programmable filters can be used to decipher data blobs and append data according to the filter’s schema. In this way, a MultiChain can be used to compile multiple UniChains into a single combined BitTree, or even better, compile multiple BitTrees into a single combined BitTree. Depending on the specific situation, these methods may prove superior to that of using a MultiChain to compile multiple UniChains into a single UniChain.
 
-### Identifying High-Level Abstractions
+#### Identifying High-Level Abstractions
 
 The structure type of high-level UniChain based data abstractions can be identified at block #0, where the structure’s protocol header exists. In the case of a BitTree, block #0 would read:
 
@@ -603,11 +606,15 @@ The structure type of high-level UniChain based data abstractions can be identif
 }
 ```
 
-### BitTree Use Cases
+#### BitTree Use Cases
 
 As illustrated in Figure BT-3, BitTrees have use cases ranging from social networks to domain name systems to distributed file systems, the latter of which will be discussed in the following section.
 
-## BitDrives
+
+## Storage
+**Coming Soon**
+
+### BitDrives
 
 In order for a serverless web to work, it must do much more than simply facilitate the exchange of abstract data blobs between peers. It must also facilitate the distribution and reproduction of higher-level data structures, such as the exchange of files and entire file systems, or something comparable to how an application’s static files are accessed through an HTTP request and web server. The dWeb can achieve this type of functionality over BIT by using a high-level UniChain based data abstraction known as a BitDrive.
 
@@ -619,7 +626,7 @@ Since BitTrees have built-in versioning and can quickly range query over numerou
 
 ![Figure BD-1](/images/Figure-BD-1.svg)
 
-### Version Control and File System Reproduction
+#### Version Control and File System Reproduction
 
 Figure BD-0 illustrates how a BitDrive is stored within an underlying BitTree. It is important to look more closely so that the actual value structure can be examined, as this is where the magic responsible for distributed file versioning and file system reproduction takes place between peer devices, as shown in Figure BD-1.
 
@@ -633,7 +640,7 @@ The reason for separating a file’s content from its metadata is simple: a peer
 
 The value structures for a file’s content and its metadata are explained below:
 
-#### Content Value Structure
+##### Content Value Structure
 
 A file’s content entry will utilize the following schema:
 
@@ -646,7 +653,7 @@ A file’s content entry will utilize the following schema:
 }
 ```
 
-#### Metadata Value Structure
+##### Metadata Value Structure
 
 A file’s metadata entry will utilize the following schema:
 
@@ -658,7 +665,7 @@ A file’s metadata entry will utilize the following schema:
 }
 ```
 
-##### Metadata Bitfield Schema
+###### Metadata Bitfield Schema
 
 Metadata is stored within a “bitfield” that exists within the metadata value field. The overall field schema is as follows:
 
@@ -668,7 +675,7 @@ The BitTree’s underlying data structure can be traversed for a file’s variou
 
 ![Figure BD-2](/images/Figure-BD-2.svg)
 
-#### File System Reproduction
+##### File System Reproduction
 
 Below is an example of how a file system is distributed from one peer device to another:
 
@@ -680,32 +687,34 @@ Below is an example of how a file system is distributed from one peer device to 
 
 A dWeb-compliant client is required to reproduce the file system on the requestor’s system. Otherwise, the requestor will end up with a UniChain.
 
-### Spare File Systems
+#### Spare File Systems
 
 Since a BitDrive contains a UniChain at its core, a partial chain or a partial file system can be distributed among peers. For instance, user Bob might be sharing a BitDrive that contains the following files:
+
 ```
 - song1.mp4
 - song2.mp4
 - video.mp4
 ```
 
-User Alice can simply request “bit://<network-address>/song1.mp4” and she will then possess a partial version of the BitDrive.
+User Alice can simply request ```bit://<network-address>/song1.mp4``` and she will then possess a partial version of the BitDrive.
 
-### BitDrive Nesting
+#### BitDrive Nesting
 
 One BitDrive can be nested within another, which means that Bob can create a drive and nest Alice’s within. Although Bob cannot alter Alice’s drive, they are both pushing updates to the same drive because when Alice’s drive is updated, Bob’s is too since Alice’s drive is a nested portion of Bob’s. In this way, nesting can be considered a very basic form of collaboration. In the near future, BitDrives will be compatible with MultiChains so that a multi-drive view can be created and live replicated. This capability will enable live collaboration within the same file system; for example, two entities editing the same spreadsheet.
 
-### Live File Updates
+#### Live File Updates
 
 Since UniChains can be live-streamed between peers, BitDrives can too. This feature is especially useful for websites and web applications – the moment a developer issues an update, the drive (the website or web application) will automatically refresh in the browser.
 
-### Truly Decentralized Websites and Web Applications
+#### Truly Decentralized Websites and Web Applications
 
 BitTrees and BitDrives make it possible to develop websites and web applications that are completely decentralized, distributed, and serverless. Together, these data structures enable web-based experiences to host their databases and files among the peers that use them. That being said, complex web applications require even higher-level services that are beyond the scope of what BitTrees and BitDrives are capable of providing.
 
 Most of today’s decentralized applications use blockchain-based smart contract engines for services such as user authentication, data storage, payments, and cooperative data systems. Unfortunately, blockchains are slow and depend on HTTP. Furthermore, they suffer from a design that inherently creates bottlenecks. As a result, blockchains will likely never possess the bandwidth needed to host global applications and the billions of users they represent. Blockchains and their “heavy” consensus protocols are simply not organic. dWeb provides a framework that is capable of delivering these services and more. SmartChains and blockchainless smart contracts will be discussed in the next section.
-    
-## SmartChains
+
+## Machines
+### SmartChains
 
 Software communities and their end-users (entities) rely on the data they consume to be “trustless,” which means that the participants need not trust one another or a third party for the system to function properly. While the data generated by an entity is stored within its own trustless UniChain, the same cannot be said for an application’s MultiChain. As discussed earlier in this paper, an application’s MultiChain combines UniChains from multiple entities into a single linearized and causally ordered UniChain, or “combined view.” The main disadvantage concerning a “naked” MultiChain is that although it derives its data from trustless and “organic” data structures, the data can be artificially altered, or filtered, as it is compiled into the MultiChain.
 
@@ -799,11 +808,11 @@ SmartChains provide a powerful alternative to blockchains, in that they are dist
 
 These attributes enable developers to create smart contract programs on their own easily deployable Turing Machines, allowing their systems to scale organically as more and more entities use their programs. In the sections that follow, several notable features of SmartChains will be discussed, including how SmartChains are able to consume data from other SmartChains and how they can execute a remote SmartChain contract and consume its output.
 
-### Open Machines and the DOOM Model
+#### Open Machines and the DOOM Model
 
 The Distributed Organic and Open Machine (DOOM) Model is made possible through a cooperative relationship between participants, towers, executors, and validators. Together, these entities compute, apply, and validate state, related to a single contract program stored within the state they collectively maintain. This cooperative relationship forms a “Distributed Turing Machine,” also known as a “Distributed State Machine.” Therefore, from here on out, “SmartChains” will simply be referred to as “Machines.”
 
-#### Machine Genesis Initialization
+##### Machine Genesis Initialization
 
 In a [single-executor machine](#single-executor), the [executor](#executors), or “distributed machine manager,” handles a machine’s genesis initialization. In a [multi-executor machine](#multi-executor), the initial executor handles a machine’s genesis initialization. A genesis initialization is a machine’s initial boot operation, which consists of the following procedures:
 
@@ -817,7 +826,7 @@ In a [single-executor machine](#single-executor), the [executor](#executors), or
 
 At this point, the machine is fully functional and participants can execute contract methods (actions) and place the resulting operations within their individual oplogs. The executor(s) watching these oplogs can deterministically apply the operations to the machine’s state.
 
-#### Participants
+##### Participants
 
 Participants are the end users of a machine. They choose which program actions they compute, compute them locally, and store the resulting operations locally within their own UniChain, also referred to as an input log, operator log, or oplog. Malicious behavior, in which a participant adds a transaction to their oplog that violates the machine’s contract, is rejected by the machine’s executors and reported as such in the machine’s state.
 
@@ -830,7 +839,7 @@ Before participants create a transaction, they first sync the `index log` head b
 
 The oplog root proof is the root hash and signature at the head of the participant’s oplog prior to initiating the current operation (transaction). The oplog root proof is then stored in the participant’s oplog.
 
-##### Executor Transaction Processing
+###### Executor Transaction Processing
 
 Executors monitor participant oplogs for newly created transactions and utilize a contracts exported `process()` function, which returns metadata related to transaction data found within a participant’s oplog. Executors then create an acknowledgment receipt, which is an object that includes the following:
 
@@ -858,13 +867,13 @@ If the `atomic()` call completes successfully, it will return a `fulfilled Promi
 
 If the `atomic()` call results in an error, some contract violation has taken place by a participant (`atomic()` will always return a “rejected Promise” if an error takes place). If an error has taken place, `ack.organic` is set to false and `ack.error` is a string describing or representing the error. Also, if an error has taken place, the data is artificial – the queue of `tx` actions is cleared and the artificial state is applied to the machine’s overall state with a receipt stored in the machine’s nucleus.
 
-##### Atomically Applying State
+###### Atomically Applying State
 
 Regardless of whether a transaction is considered organic or artificial, an acknowledgement receipt is always stored in the machine’s nucleus at `.nucleus/acks/{ oplog-pubkey-hex }/seq`, where `seq` is the block number related to the oplog transaction (the block of the participant’s UniChain where the transaction was created). The queued actions within the `atomic()` function are then atomically applied to the machine’s index-log.
 
 The participant/executor model can be seen in Figure SC-1.
 
-##### Participant’s Acknowledgement of Execution
+###### Participant’s Acknowledgement of Execution
 
 A participant, while awaiting a transaction to be executed, can monitor its status by watching the machine’s index-based nucleus acknowledgement state at `.nucleus/acks/{ oplog-pubkey-hex }/seq`, in which `seq` is the block number where the newly minted transaction exists within the participant’s local oplog. Once an executor publishes the acknowledgement receipt related to the participant’s transaction, the participant is able to fetch the following information for each operation related to the transaction from the index log.
 
@@ -875,7 +884,7 @@ A participant, while awaiting a transaction to be executed, can monitor its stat
 
 This process is referred to as `Acknowledgement of Execution` (AOE).
 
-#### Towers
+##### Towers
 
 Towers are participants that allow for `public actions` to be executed within a contract by third-parties that are not oplog bearers. Towers publish RPC-based endpoints that allow for the outside execution of a contract’s public actions. An example of a public action would be an action that allows participants to join a machine. Considering participants (end users) can only execute contract actions and publish their own state via oplogs, a participant’s oplog identifier would have to be published to the machine’s index log within its nucleus state (.nucleus/inputs/oplog-pubkey-hex) before the participant could execute actions from a machine’s contract. Figure SC-2 shows end users of a social network operating through towers rather than operating their own oplogs.
 
@@ -887,7 +896,7 @@ Note: It is recommended that end users of a contract are participants and that t
 
 Towers take an AOE and use it to compile their RPC-based responses. The proofs within an AOE can be used by [validators](#validators) and executors when validating data that derives from remote sources.
 
-#### Executors
+##### Executors
 
 Executors watch the oplogs of participants and towers and “apply” the operations that derive from their transactions atomically to the machine’s index log, per the contract’s “apply” rules. The following is an example program that sends coins from one participant to another:
 
@@ -963,7 +972,7 @@ Once checks are complete, `SEND` pushes three `put()` calls in the `tx` queue, a
 
 Note: the contract above omitted several actions for creating accounts, onboarding participants via towers and many other actions for the sake of brevity.
 
-##### Single-Executor
+###### Single-Executor
 
 A single executor ensures that a contract’s transactions are deterministically and linearly applied to a machine’s state. That being said, a single-executor can choose to censor the oplogs of a specific participant by simply removing them from a machine’s inputs. In scenarios in which there is a single executor, executor treason can leave a machine in an unrecoverable state. Even so, a machine can be forked by a community of participants and they can choose a new executor from the pool of participants. In this case, the chain continues running on a new machine that is comprised of the old machine’s data, minus the compromised part of state, unless of course the community decides to leave record of the executor’s treason.
 
@@ -971,11 +980,11 @@ In this way, contracts and the applications that integrate with them can be prog
 
 ![Figure SC-3: Single-Executor Model](/images/Figure-SC-3-Single-Executor-Model.svg)
 
-##### Multi-Executor and Proof-of-Execution (POE) Consensus
+###### Multi-Executor and Proof-of-Execution (POE) Consensus
 
 [ Coming Soon ]
 
-#### Validators
+##### Validators
 
 Outside validators (third parties) and participants “monitor” the main index log for executor treason by replaying a machine’s oplogs (inputs) and deterministically applying the oplogs to the main index log, which can then be computed against the machine’s published index log. This process takes mere seconds, even for massive index logs, allowing validators to quickly broadcast treason to participants. If there are no `diffs` between the generated index log and the published index log, the machine is considered organic and its data validated. On the other hand, if `diffs` do exist, the machine is considered compromised. A message is then sent out over BIT to the machine’s swarm that the log has been compromised and cannot be trusted. This message is sent out by the first validator that discovers executor treason.
 
@@ -993,7 +1002,7 @@ Merkle trees mathematically prove that any particular “version” of a UniChai
 
 As was mentioned earlier, oplogs are naked UniChains, while index logs are built on BitTree’s high level data abstraction. Using BitTree’s embedded indexes, a machine’s state can be read efficiently. As was shown in the previous contract example, output methods (executor apply methods) utilize a key-value schema. BitTree’s sparse state synching means that consumers of a machine’s output (its index log) only have to download the portions of state they need, while still being able to validate the index log’s Merkle tree.
 
-##### Proof of Violation (POV)
+###### Proof of Violation (POV)
 
 Efficiently and persistently syncing logs over BIT with multiple validators as transactions are created, reduces the likelihood of participants or executors violating the append-only constraint. Once a validator has fully synched the entire state of all logs, it replays all oplogs deterministically against the contract’s apply function. The validator then compares its generated index log with the machine’s published indexed log. If `diffs` are discovered, the validator gives notice of the violation by sharing a “Proof of Violation” (POV) that includes the following:
 
@@ -1011,7 +1020,7 @@ Each UniChain entry has an “Inclusion Proof” that includes the following:
 
 Inclusion Proofs prove that an entry within a UniChain derived from its author, since the signature proves ownership and the hash of its state proves the location of the entry within its state (its block number or length). Inclusion Proofs therefore allow one machine to reference data from another, considering one proof can be connected and included alongside another in a processed called “proof chaining.” This same process is used to connect oplogs to a machine’s index log, since root proofs of an oplog are included within a transaction’s AOE within the index log.
 
-##### Validation Flow for Single-Executor
+###### Validation Flow for Single-Executor
 
 The following flow takes place during the machine validation process:
 
@@ -1047,11 +1056,11 @@ The following flow takes place during the machine validation process:
    - If `newContractSource` is not `null`, replace the active VM with its value.
    - Iterate each entry in `oplogChanges` and add or remove oplogs from the machine’s nucleus, according to the encoded changes (additions or removals).
 
-#### Smart Contract Programs
+##### Smart Contract Programs
 
 As mentioned previously, each machine initializes a smart contract program as block 1 of the machine’s index log. Each contract defines an API for creating transactions in a participant’s oplog in the form of “actions.” Each contract also defines a pure `apply` function for deterministically producing the index log from a machine’s oplogs. The deterministic nature of the `apply` function allows for the index log to be continuously reproduced from any historical point in the state. The important part about the `apply` function is that operations are ALWAYS executed in the same order. This consistency is due in part to the pureness of the `apply` function, which does not allow for the generation of timestamps or pseudo-randomness.
 
-##### JavaScript and Nova VM
+###### JavaScript and Nova VM
 
 Smart contract programs are written in JavaScript, the most widely-used computer programming language. As it relates to the dWeb, this prevalence lowers barriers to entry, allowing any software developer with a basic understanding of JavaScript to write SmartChain based programs. Since dWeb applications (distributed in BitDrives) are also written in JavaScript, as well as HTML and CSS, JavaScript developers will very likely rule the dWeb.
 
@@ -1063,7 +1072,7 @@ Nova was also designed to ensure the deterministic execution of contracts. Due t
 
 These features ensure that a potentially untrusted contract program cannot harm a participant’s local system, and that machines can be deterministically replayed in order to validate a machine’s state safely and efficiently.
 
-##### Core Engine APIs
+###### Core Engine APIs
 
 SmartChain’s core software comes equipped with many core APIs that simplify smart contract development. These core APIs follow a set of [Core Data Schemas](#core-data-schemas) that are described in a subsequent section. The following Core APIs are included:
 
@@ -1159,16 +1168,16 @@ value: {
 
 These deterministic schemas allow for plugins to be developed around these core APIs.
 
-##### SmartChain Plugins
+###### SmartChain Plugins
 
 Developers can develop plugins for SmartChain contracts, publish on NPM and allow other developers to utilize their SmartChain APIs. SmartChain plugins can be imported by any contract and used to expand its functionality. SmartChain plugins are the Legos of decentralized application development.
 
-#### Cross-Machine Data Fetching
+##### Cross-Machine Data Fetching
 
 As was explained in the [Remote API](#remote) section, one machine’s contract can fetch data from another machine’s state. This functionality is made possible by the `remote.get()` core API method. However, this process is not as simple as it seems. `get()` is passed a Uniform Machine Identifier (UMI) consisting of an `address/key` or “domain/key” schema:
 
-- If the UMI uses a domain/key schema, the domain is resolved to an address by performing a lookup via the BitNames machine for the “DC” record type. After resolving the address, the schema is converted to “address/key”. The resolver in this case is referred to as [Brane](https://docs.dw3b.network/libraries/brane). Brane is able to perform cross-registrar lookups as more domain name registrars are launched.
-- A [dWeb Swarm](https://docs.dw3b.network/libraries/swarm) instance is initiated, performing a lookup on a dWeb-compliant DHT for the address. The data related to the key (<address>/user/neo) is sparsely fetched from the machine’s swarm (its peers).
+- If the UMI uses a domain/key schema, the domain is resolved to an address by performing a lookup via the BitNames machine for the “DC” record type. After resolving the address, the schema is converted to ```address/key```. The resolver in this case is referred to as [Brane](https://docs.dw3b.network/libraries/brane). Brane is able to perform cross-registrar lookups as more domain name registrars are launched.
+- A [dWeb Swarm](https://docs.dw3b.network/libraries/swarm) instance is initiated, performing a lookup on a dWeb-compliant DHT for the address. The data related to the key (```<address>/user/neo```) is sparsely fetched from the machine’s swarm (its peers).
 - The data returned by `remote.get()` uses the following envelope:
 
 ```
