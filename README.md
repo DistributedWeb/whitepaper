@@ -13,7 +13,7 @@
 - **v5.0** - November 7th, 2022
 
 ## Core Concepts
-- [dWeb Networking](#dweb-networking)
+- [Distributed Networking](#distributed-networking)
 - [UniChains](#unichains)
 - [MultiChains](#multichains)
 - [BitTrees](#bittrees)
@@ -107,7 +107,7 @@ My hope is that by allowing countless numbers of tiny, ever-expanding data parti
 True end-to-end decentralization has arrived. Welcome to the dWeb.<br>
 -Neo
 
-## dWeb Networking
+## Distributed Networking
 
 As you will learn in this paper, the dWeb can be thought of as a multitude of entities (humans, robots, devices, apps, etc.) announcing and streaming distributed data structures among one another. These data structures include UniChains (single-writer ledgers), MultiChains (a causally ordered or linearized view of multiple UniChains), SmartChains (programmable and cooperative UniChains), BitDrives (UniChain based file systems), and BitTrees (UniChain based, binary tree, key-value stores). Essentially, one could state that the dWeb is comprised of UniChains, and they would be correct. UniChains and higher-level data structures are identifiable and discoverable on the Internet by a unique SHA-256 based cryptographic network address, which is discoverable using dWeb’s distributed hash table.
 
