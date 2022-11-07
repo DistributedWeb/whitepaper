@@ -1303,8 +1303,6 @@ A dWeb-compliant dDNS utilizes several “Resource Record” types for different
 | SRV | Service record for identifying a service. |
 | PX | Peer address. |
 
-For more information on BitNames, read the documentation located [here](https://dw3b.network/bitnames). To read more about the dWeb's Decentralized Domain Name System (dDNS) specification, please read BRC-2 located [here](https://docs.dw3b.network/brcs/2).
-
 #### Resource Record Data Model
 Resource Record data that is stored within a dDNS Registry, must utilize the following Data Model:
 
