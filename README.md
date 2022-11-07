@@ -50,6 +50,7 @@ Unlike Bitcoin, dWeb is just a specification that's built around the core ideas 
 While we only make up a small army of cryptographers, when the world adopts our creations, revolutions form and a much larger army appears on the horizon. Like the Apache Indians, our decentralized make up will be impossible for the Incas to defeat. This is the Great Reawakening. This is our moment. This is our war-to-win, in fact, the war is already won, we just have to begin the fight. Lastly, we will never forgive, we will never forget and we are always watching. You can expect us when the terrain is rough. You will find us when freedom is in jeopardy. Whether it’s the invasion of our countries or our freedoms, one element remains the same within our Universe’s immutable state: each invasion God has triumphed – and we will triumph again.
 
 Onward.
+
 Neo Thawreww 
 
 7 November 2022
