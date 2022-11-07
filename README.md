@@ -14,16 +14,17 @@
 
 ## Core Concepts
 - [Distributed Networking](#distributed-networking)
-- [UniChains](#unichains)
-- [MultiChains](#multichains)
-- [BitTrees](#bittrees)
-- [BitDrives](#bitdrives)
-- [SmartChains](#smartchains)
-- [BitNames](#bitnames)
-- [BitID](#bitid) // Under development
-- [BitCurrency](#bitcurrency) // Under development
-- [BitOrgs](#bitorgs) // Coming soon
-- [BitTables](#bittables) // Coming soon
+- [Single-Writer Logs](#single-writer-logs)
+- [Binary Interplanetary Transport Protocol](#binary-interplanetary-transport-protocol)
+- [Multi-View Logs](#multi-view-logs)
+- [Databases](#databases)
+- [Storage](#storage)
+- [Machines](#machines)
+- [Domains](#domains)
+- [Identity](#identity) // Under development
+- [Currency](#currency) // Under development
+- [Organizations](#organizations) // Coming soon
+- [App-Specific DHTs](#app-specific-dhts) // Coming soon
 
 ## Manifesto
 
@@ -129,8 +130,10 @@ What makes a DHT so efficient is the manner in which it distributes data among p
 
 This paper does not intend to explain the inner workings of Kademlia DHT. Those looking for an in-depth explanation should read Kademlia’s official whitepaper located [here](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf). 
 
-## UniChains
+## Single-Writer Logs
+**Coming Soon**
 
+### UniChains
 A UniChain is a single-writer append-only ledger (SWL) that is designed to be exchanged between participants of a peer-to-peer network, without the risk of peers, other than the creator, altering its overall state. Every UniChain has a key-pair in which the private key holder is the only entity that can append data to the ledger. Entities that possess the public key can validate the authenticity of data within the ledger. Together, these traits make a UniChain a trustless distributed data structure.
 
 From a computer science perspective, UniChains are binary append-only data structures that can be streamed between multiple network participants. The contents of these data structures are cryptographically hashed and signed. UniChains are identified internally by signed Merkle trees and are identified on the dWeb using a public key, which is discoverable using a chainID (dWeb network address) that is derived from the public key and stored within a dWeb-compliant DHT.
@@ -141,13 +144,13 @@ A pseudo-representation of a UniChain would look as follows:
 
 ![Pseudo-Representation of a UniChain](/images/Pseudo-Representation-of-a-UniChain.svg)
 
-### Data Integrity
+#### Data Integrity
 
 Data within a UniChain is stored as “blocks” which are identified by an “index.” Each block is signed by its creator so that a UniChain can be audited as to whether the data stored within it aligns with the hashes in the Merkle tree. This structure ensures that peers can request and stream (exchange) a specific block or block range with other peers, rather than the entire UniChain, while still being able to validate the partial chain.
 
 Merkle trees are utilized within UniChains to create a way of identifying the content of a dataset by using hashes. The concept is simple: if the underlying content of a UniChain changes, the hash changes. When a block is added to the chain, a UniChain functions as a ledger that calls the “append()” mutation, thereby adding a new leaf to the tree and generating a new root hash. A UniChain’s private key is used to sign the root hash every time a new root hash is generated. This digital signature is sent to recipients along with the root hash so that recipients can verify its integrity.
 
-### User-Controlled Data
+#### User-Controlled Data
 
 The dWeb is built around a simple concept: that each entity (human, device, robot, application, etc.) should maintain its own ledger or ledgers independent of other entities. This concept allows for the creation of custom materialized views surrounding multiple UniChains, resulting in a more organic and open system.
 
@@ -155,7 +158,35 @@ This concept also ensures that entities can control their own data and, importan
 
 This fundamental change forces apps to compete around data rather than over data. For example, Social Network A may choose to filter some of user Bob’s posts, but those very same posts might appear on Social Network B because it is consuming Bob’s posts and choosing to filter them in a different way. Keep in mind, the data in this example belongs to Bob and not the applications that consume it. In other words, while Social Network A may choose to filter Bob, his data remains ever-present and unaltered since Bob is the only entity that can change his data. Consider also that Social Network C, or any other application for that matter, may choose to consume and materialize Bob’s data in a unique way by simply using different filters.
 
-### Binary Interplanetary Transport Protocol
+#### Live UniChain Replication
+
+As mentioned previously, peers of a given UniChain can stream live so long as it was indicated by the requestor during the BIT handshake phase. Since the UniChain’s creator is live replicating by default, peers can do the same by live replicating their version to other peers, and so forth. Below is a pseudo-representation of live replication: 
+
+![Pseudo-Representation of Live Replication](/images/Pseudo-Representation-of-Live-Replication.svg)
+
+This type of replication makes UniChains a perfect fit for live media streaming and real-time communications like voice, video, and text. Real-time communication between two or more parties is made possible by MultiChains, causal streaming, and peers agreeing to live replicate their data among one another. You can learn more about MultiChains [here](#multichains).
+
+#### Chainstore Management and Replication
+
+The private key related to a UniChain is stored locally on the creating entity’s system, which is also the only system that can append blocks to the chain. This attribute presents a problem in situations in which a creating entity needs to mutate its UniChain from multiple systems (a human entity mutating its chain from a desktop and mobile device). Additionally, it is certain that an entity will create many UniChains as it travels through the dWeb; a problem as the replication of the entity’s chains will lead to a large number of connections to and from the entity’s network.
+
+Considering these problems, a model was needed for managing and replicating UniChains and synchronizing write privileges (private keys) across multiple systems. Chainstore is that model and is essentially a hive of UniChains consisting of a default UniChain that derives the sub-UniChains below it.
+
+Below is a pseudo-representation of sub-UniChains within a Chainstore:
+
+![Pseudo-Representation of Sub-UniChains Within a Chainstore](/images/Pseudo-Representation-of-Sub-UniChains-Within-a-Chainstore.svg)
+
+Key-pairs corresponding to the sub-UniChains derive from the keys of the default UniChain, meaning that write access to the hive can be obtained by possessing the keys to the default UniChain.
+
+Chainstore provides a protocol for synchronizing write privileges of the underlying hive, or a specific sub-UniChain, to remote entities, known as the Distributed UniChain Key Syncing (DUCKS) Protocol. For more information on the DUCKS protocol, read the DUCKS Whitepaper located [here](https://ducks.bitweb.org).
+
+Chainstore has modules for generating, retrieving, and live replicating UniChains, even UniChains to which an entity does not possess write privileges. These modules, for instance, make it possible for an entity like a web application to easily generate and interact with UniChains on another entity’s system (a human entity’s computer). In this way, a web application can utilize the Chainstore module to initiate the synchronization of write privileges to multiple systems (a human entity’s mobile device or tablet) so that an entity can mutate its UniChains from multiple systems.
+
+#### Use Cases for SWLs
+
+Given that a UniChain is a single trustless binary file that can be used to represent any type of data distributed to any Internet entity, one could consider a UniChain to have an unlimited number of use cases. Data is not limited to web applications; data within UniChains can take on all shapes and sizes. For instance, as will be discussed in [BitDrives](#bitdrives), a UniChain can be used to store the binary representation of an entire file system, which can then be exchanged between peers. Human entities can use UniChains to store data related to applications and their devices. Robots can use UniChains to store data related to their machine learning algorithms. Devices can use UniChains to store data related to their outputs. Developers can use UniChains to store the files related to an application so that the app is distributed and completely serverless. Whether distributed databases for web applications, distributed file systems, distributed machine learning, distributed IoT, or [distributed computers](#distributed-turing-computers), UniChains work with virtually any type of data.
+
+## Binary Interplanetary Transport Protocol
 
 HTTP (Hypertext Transfer Protocol) is an application layer protocol used throughout the web for transferring information between servers and clients. Generally speaking, an application layer protocol defines the process for how clients on different systems transfer messages between one another. HTTP is an example of the client-server model. In this model, a client requests a resource located at an IP address or a domain that resolves to an IP address using an application such as a telnet or web browser. The response is handled by a server, which processes the client’s request and responds with a specific type of information.
 
@@ -167,7 +198,7 @@ Other communication protocols have been created for querying server-based data s
 
 The dWeb enables the transition away from the client-server model and HTTP, making possible a serverless web that utilizes a single transport protocol. This new transport protocol, which is a wire-based protocol that transfers pure binary, leaving the process of data conversion to the consuming application, is known as the Binary Interplanetary Transport (BIT) Protocol. Whether HTML, JSON, CSS, or JavaScript, data is stored as binary within a UniChain, and when that data is requested by another peer it is transported as binary over BIT to the requesting peer. Computers and network devices speak machine code at their lowest level; thus, utilizing binary yields a very efficient means of data transmission.
 
-#### Bit Request Types
+### Bit Request Types
 
 BIT request messages are sent directly to peers (after peers have been discovered on the DHT in relation to a particular UniChain) similar to how HTTP request messages are sent from client to server. For example, if a dWeb-compliant browser were to look up a dWeb network address on a dWeb-compliant DHT, the DHT would return the peers and their network information back to the browser. From there, the browser would make a connection to one or more peers and begin sending request messages related to the underlying UniChain.
 
@@ -188,7 +219,7 @@ The requestor and peers would then exchange a series of messages until the peers
 | 10-14 | Unused | n/a |
 | 15 | Custom | Custom extension message |
 
-#### dWeb Data Model
+### dWeb Data Model
 
 On the dWeb, peers can exchange any kind of data. UniChains represent the first standardized distributed dataset for the dWeb, and they are used in high-level abstractions such as [BitDrives](#bitdrives) and [BitTrees](#bittrees). Other custom high-level abstractions involving a UniChain can be created, but at the end of the day, these abstractions remain UniChains at their lowest level. Put simply, any and all datasets on the dWeb are comprised of blocks in a linearized chain, each of which is filled with abstract blobs of binary data.
 
@@ -202,7 +233,7 @@ The BIT protocol can work with any UniChain abstraction, so long as the abstract
 - Each time a chain’s creator appends data to the chain, a block is added, and a new root hash is calculated and signed with the creator’s private key.
 - When downloading a chain or a specific block, a peer can use the chain’s public key to verify its signature, which in turn verifies the integrity of other blocks and hashes.
 
-#### Peer Messaging Process
+### Peer Messaging Process
 
 Once peers have been discovered in connection with a dWeb network address, a requestor can then begin exchanging messages with peers that have announced themselves as seeds of the data. Below is a summary of the message process that takes place between a requestor and a seeding peer.
 
@@ -276,35 +307,8 @@ The `nodes` field contains a subfield that looks as follows:
 | 3 | Size | Total length of data in block that hash covers |
 | 4 | Signature | 64-byte ed25519 signature of next hash corresponding to block hash |
 
-The signature can then be validated against the UniChain’s public key to verify that the data being received belongs to the correct UniChain.
+The signature can then be validated against the UniChain’s public key to verify that the data being received belongs to the correct UniChain.****
 
-### Live UniChain Replication
-
-As mentioned previously, peers of a given UniChain can stream live so long as it was indicated by the requestor during the BIT handshake phase. Since the UniChain’s creator is live replicating by default, peers can do the same by live replicating their version to other peers, and so forth. Below is a pseudo-representation of live replication: 
-
-![Pseudo-Representation of Live Replication](/images/Pseudo-Representation-of-Live-Replication.svg)
-
-This type of replication makes UniChains a perfect fit for live media streaming and real-time communications like voice, video, and text. Real-time communication between two or more parties is made possible by MultiChains, causal streaming, and peers agreeing to live replicate their data among one another. You can learn more about MultiChains [here](#multichains).
-
-### Chainstore Management and Replication
-
-The private key related to a UniChain is stored locally on the creating entity’s system, which is also the only system that can append blocks to the chain. This attribute presents a problem in situations in which a creating entity needs to mutate its UniChain from multiple systems (a human entity mutating its chain from a desktop and mobile device). Additionally, it is certain that an entity will create many UniChains as it travels through the dWeb; a problem as the replication of the entity’s chains will lead to a large number of connections to and from the entity’s network.
-
-Considering these problems, a model was needed for managing and replicating UniChains and synchronizing write privileges (private keys) across multiple systems. Chainstore is that model and is essentially a hive of UniChains consisting of a default UniChain that derives the sub-UniChains below it.
-
-Below is a pseudo-representation of sub-UniChains within a Chainstore:
-
-![Pseudo-Representation of Sub-UniChains Within a Chainstore](/images/Pseudo-Representation-of-Sub-UniChains-Within-a-Chainstore.svg)
-
-Key-pairs corresponding to the sub-UniChains derive from the keys of the default UniChain, meaning that write access to the hive can be obtained by possessing the keys to the default UniChain.
-
-Chainstore provides a protocol for synchronizing write privileges of the underlying hive, or a specific sub-UniChain, to remote entities, known as the Distributed UniChain Key Syncing (DUCKS) Protocol. For more information on the DUCKS protocol, read the DUCKS Whitepaper located [here](https://ducks.bitweb.org).
-
-Chainstore has modules for generating, retrieving, and live replicating UniChains, even UniChains to which an entity does not possess write privileges. These modules, for instance, make it possible for an entity like a web application to easily generate and interact with UniChains on another entity’s system (a human entity’s computer). In this way, a web application can utilize the Chainstore module to initiate the synchronization of write privileges to multiple systems (a human entity’s mobile device or tablet) so that an entity can mutate its UniChains from multiple systems.
-
-### Use Cases for SWLs
-
-Given that a UniChain is a single trustless binary file that can be used to represent any type of data distributed to any Internet entity, one could consider a UniChain to have an unlimited number of use cases. Data is not limited to web applications; data within UniChains can take on all shapes and sizes. For instance, as will be discussed in [BitDrives](#bitdrives), a UniChain can be used to store the binary representation of an entire file system, which can then be exchanged between peers. Human entities can use UniChains to store data related to applications and their devices. Robots can use UniChains to store data related to their machine learning algorithms. Devices can use UniChains to store data related to their outputs. Developers can use UniChains to store the files related to an application so that the app is distributed and completely serverless. Whether distributed databases for web applications, distributed file systems, distributed machine learning, distributed IoT, or [distributed computers](#distributed-turing-computers), UniChains work with virtually any type of data.
 
 ## MultiChains
 
