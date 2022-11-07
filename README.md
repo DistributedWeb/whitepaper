@@ -1240,7 +1240,11 @@ As will be seen in the final sections of this paper, dMachines can be used to bu
 - IoT networks.
 
 ## dDNS 
-**Under Development**
+In order to create a truly distributed and decentralized web, the dWeb cannot be dependent upon centralized domain names and the Internet's tree-structured name space and is not compatible with the Internet's "Domain Name System" (as defined in RFC 1034 and 1035). The dWeb needed its own domain name system that was compatible with dWeb-compliant network addresses. The dWeb would be pretty hard to use without domain names or a directory-like service for dWeb network addresses, considering that 32-byte addresses are difficult to remember. A Domain Name System is a directory lookup service that provides mapping between the names of a host on the Internet and a numerical address or a canonical name. DNS is essential to the functioning of the Internet. 
+
+dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning the registration of Decentralized Top-Level Domains (dTLDs) and the registration of dTLD-based domain names are distributed and decentralized, where records are distributed across the computers of peers on the network related to a given dDNS registry. Like DNS, dDNS is a directory lookup service and provides a mapping between the name of a dDrive, device or peer and a dWeb-based network address. dDNS is essential to the functioning of the dWeb. A dDNS registry is a network of peers that share data regarding dTLDs, registered domains and their associated domain name records. Unlike traditional DNS, dWeb's dDNS does not utilize nameservers since the dWeb is completely serverless. DNS records are stored in distributed databases, whether they be a dDatabase, a dMachine's indexLog or a DHT (if a domain registry is built around an [app-specific DHT](#app-specific-dhts)). Data related toa dDNS registry are resolved using resolvers that simply query the distributed database. We have created a reference implementation known as the [Brane Resolver](#brane-resolver) which showcases how domains can be resolved. The dWeb's dDNS model is depicted in Figure BN-2.
+
+
 
 ## dIdentity
 **Under Development**
