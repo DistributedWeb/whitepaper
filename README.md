@@ -1057,7 +1057,7 @@ SmartChain’s core software comes equipped with many core APIs that simplify sm
 - [Governance](#governance)
 - [Index](#index)
 - [Remote](#remote)
-- [Horizon](#horizon-api
+- [Horizon](#horizon-api)                                                                
 - [BitcoinIQ](#bitcoiniq-api)
 - [BitNames](#bitnames-api)
 
