@@ -1,10 +1,7 @@
 ## The Distributed Web (dWeb)
 
 #### Authored By:
-##### Jared Rice Sr.
-##### Neo Thawreww
-##### Shikhar Srivastava
-##### Vinay Gupta
+##### Jared Rice Sr., Neo Thawreww, Shikhar Srivastava and Vinay Gupta
 
 #### Versions
 ##### Version 1.0 - October 7th, 2018
