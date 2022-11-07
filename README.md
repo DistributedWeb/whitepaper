@@ -14,9 +14,9 @@
 
 ## Core Concepts
 - [Distributed Networking](#distributed-networking)
-- [Single-Writer Logs](#single-writer-logs)
+- [UniChains](#unichains)
 - [Binary Interplanetary Transport Protocol](#binary-interplanetary-transport-protocol)
-- [Multi-View Logs](#multi-view-logs)
+- [MultiChains](#multichains)
 - [Databases](#databases)
 - [Storage](#storage)
 - [Machines](#machines)
@@ -130,10 +130,8 @@ What makes a DHT so efficient is the manner in which it distributes data among p
 
 This paper does not intend to explain the inner workings of Kademlia DHT. Those looking for an in-depth explanation should read Kademlia’s official whitepaper located [here](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf). 
 
-## Single-Writer Logs
-**Coming Soon**
 
-### UniChains
+## UniChains
 A UniChain is a reference implementation of a single-writer append-only ledger (SWL) that is designed to be exchanged between participants of a peer-to-peer network, without the risk of peers, other than the creator, altering its overall state. Every UniChain has a key-pair in which the private key holder is the only entity that can append data to the ledger. Entities that possess the public key can validate the authenticity of data within the ledger. Together, these traits make a UniChain a trustless distributed data structure.
 
 From a computer science perspective, UniChains are binary append-only data structures that can be streamed between multiple network participants. The contents of these data structures are cryptographically hashed and signed. UniChains are identified internally by signed Merkle trees and are identified on the dWeb using a public key, which is discoverable using a chainID (dWeb network address) that is derived from the public key and stored within a dWeb-compliant DHT.
@@ -144,13 +142,13 @@ A pseudo-representation of a UniChain would look as follows:
 
 ![Pseudo-Representation of a UniChain](/images/Pseudo-Representation-of-a-UniChain.svg)
 
-#### Data Integrity
+### Data Integrity
 
 Data within a UniChain is stored as “blocks” which are identified by an “index.” Each block is signed by its creator so that a UniChain can be audited as to whether the data stored within it aligns with the hashes in the Merkle tree. This structure ensures that peers can request and stream (exchange) a specific block or block range with other peers, rather than the entire UniChain, while still being able to validate the partial chain.
 
 Merkle trees are utilized within UniChains to create a way of identifying the content of a dataset by using hashes. The concept is simple: if the underlying content of a UniChain changes, the hash changes. When a block is added to the chain, a UniChain functions as a ledger that calls the “append()” mutation, thereby adding a new leaf to the tree and generating a new root hash. A UniChain’s private key is used to sign the root hash every time a new root hash is generated. This digital signature is sent to recipients along with the root hash so that recipients can verify its integrity.
 
-#### User-Controlled Data
+### User-Controlled Data
 
 The dWeb is built around a simple concept: that each entity (human, device, robot, application, etc.) should maintain its own ledger or ledgers independent of other entities. This concept allows for the creation of custom materialized views surrounding multiple UniChains, resulting in a more organic and open system.
 
@@ -158,7 +156,7 @@ This concept also ensures that entities can control their own data and, importan
 
 This fundamental change forces apps to compete around data rather than over data. For example, Social Network A may choose to filter some of user Bob’s posts, but those very same posts might appear on Social Network B because it is consuming Bob’s posts and choosing to filter them in a different way. Keep in mind, the data in this example belongs to Bob and not the applications that consume it. In other words, while Social Network A may choose to filter Bob, his data remains ever-present and unaltered since Bob is the only entity that can change his data. Consider also that Social Network C, or any other application for that matter, may choose to consume and materialize Bob’s data in a unique way by simply using different filters.
 
-#### Live UniChain Replication
+### Live UniChain Replication
 
 As mentioned previously, peers of a given UniChain can stream live so long as it was indicated by the requestor during the BIT handshake phase. Since the UniChain’s creator is live replicating by default, peers can do the same by live replicating their version to other peers, and so forth. Below is a pseudo-representation of live replication: 
 
@@ -166,7 +164,7 @@ As mentioned previously, peers of a given UniChain can stream live so long as it
 
 This type of replication makes UniChains a perfect fit for live media streaming and real-time communications like voice, video, and text. Real-time communication between two or more parties is made possible by MultiChains, causal streaming, and peers agreeing to live replicate their data among one another. You can learn more about MultiChains [here](#multichains).
 
-#### Chainstore Management and Replication
+### Chainstore Management and Replication
 
 The private key related to a UniChain is stored locally on the creating entity’s system, which is also the only system that can append blocks to the chain. This attribute presents a problem in situations in which a creating entity needs to mutate its UniChain from multiple systems (a human entity mutating its chain from a desktop and mobile device). Additionally, it is certain that an entity will create many UniChains as it travels through the dWeb; a problem as the replication of the entity’s chains will lead to a large number of connections to and from the entity’s network.
 
