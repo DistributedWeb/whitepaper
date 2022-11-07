@@ -1252,6 +1252,21 @@ dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domain
 
 ### Decentralized Domains
 
+#### Domain Name Data Model
+Domain data that is stored within a dDNS Registry must conform to the following Data Model:
+
+- key - ```/domain/<domainName>```
+- value:
+
+
+```
+{
+  dateRegistered: <timestamp>, // when was this domain registered?
+  ownerDid: <didAddress>, // address of the owner's DID document
+  publicKey: <publicKeyOfOwner>, // public key of the domain's owner.
+  otherData: {} // an object for storing futher data.
+}
+```
 
 ### Resource Records 
 
@@ -1290,6 +1305,7 @@ Resource Record data that is stored within a dDNS Registry, must utilize the fol
   createdAt: <timestamp>, // timestamp of when this record was originally created.
   lastModified: <timestamp>, // timestamp of when this record was last modified.
   publicKey: <publicKeyOfCreator> // public key of the record's creator.
+  otherData: {} // an object for storing futher data.
 }
 ```
 
