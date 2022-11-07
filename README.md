@@ -15,7 +15,7 @@
 ## Core Concepts
 - [Distributed Networking](#distributed-networking)
 - [UniChains](#unichains)
-- [Binary Interplanetary Transport Protocol](#binary-interplanetary-transport-protocol)
+- [Binary Interplanetary Transport Protocol (BIT)](#binary-interplanetary-transport-protocol)
 - [MultiChains](#multichains)
 - [dDatabases](#ddatabases)
 - [dDrives](#ddrives)
