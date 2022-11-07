@@ -1309,18 +1309,18 @@ BitNames is decentralized, blockchainless, serverless, and globally elastic: in 
 ![Figure BN-2: dWeb Decentralized Domain Name System](/images/Figure-BN-2-Web4-Decentralized-Domain-Name-System.svg)
 
 
-## BitID
+## dIdentity
 **Under Development**
 ### Horizon
 **Under Development**
 
-## BitMoney
+## dCash
 **Under Development**
 ### BitcoinIQ
 
 **Under Development**
 
-## BitOrgs
+## dOrganizations
 
 **Under Development**
 
