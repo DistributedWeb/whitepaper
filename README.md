@@ -1252,7 +1252,7 @@ dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domain
 #### dTLD Data Model
 Domain data that is stored within a dDNS Registry must conform to the following Data Model:
 
-- key - ```/domain/<domainName>```
+- key - ```/dtld/<dtldName>```
 - value:
 
 
@@ -1328,18 +1328,44 @@ Resource Record data that is stored within a dDNS Registry, must utilize the fol
 
 
 ### Resolving Records
-1. A User Program queries “domain.x” and a record type.
-2. The Brane Resolver queries the Brane dDatabase for “.x” which returns the public key of BitName’s Index Log.
-3. The Brane Resolver then queries the BitName dDatabase using the UML -`bit://bitnames.x/domain.x/root/BD`, which returns the `root` BD record for `domain.x`. Root Records are considered `wildcard records` on the dWeb. The returned record has the following envelope:
+Querying a dDNS Registry for data should be pretty straightforward, since a compliant dDNS Registry is built on a distributed key-value store that is either compliant with the dDatabase specification or a DHT.
+
+- To resolve a query for any dWeb-compliant domain name, simply query the key `/domains/<domain>`. This should return the following data:
+```
+{
+  "dateRegistered": <timestamp>, // when was this domain registered?
+  "owners": [], // addresses of owner(s) DID document(s)
+  "otherData": {} // an object for storing futher data.
+}
+```
+
+- To resolve a query for any dWeb-compliant domain name resource record, simply query the key `/rr/<domainRecord>`. This should return the following data:
 
 ```
 {
-    domain: “domain.x”,
-    address: “<key>”
+  "rrType": <rrType>, // example: CNAME
+  "rdata": <hash>, // what dWeb address does this record point to?
+  "createdAt": <timestamp>, // timestamp of when this record was originally created.
+  "lastModified": <timestamp>, // timestamp of when this record was last modified.
+  "publicKey": <publicKeyOfRecordAuthor> // public key of the record's creator. Must be in the `owners` array within the Domain data.
+  "class": <recordClass>,
+  "ttl": <ttl>,
+  "description": "my website",
+  "otherData": {} // an object for storing futher data.
+}
+```
+
+- To resolve a query for any dWeb-compliant dTLD, simply query the key `/dtld/<dtldName>`. This should return the following data:
+```
+{
+  "dateRegistered": <timestamp>, // when was this dTLD registered?
+  "owners": [], // addresses of owner(s) DID document(s)
+  "otherData": {} // an object for storing futher data.
 }
 ```
 
 #### Brane Resolver Implementation
+For more information on the Brane Resolver, please go to its [official repository](https://github.com/distributedweb/brane-resolver).
 
 ## dIdentity
 **Under Development**
