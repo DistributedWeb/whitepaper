@@ -4,11 +4,11 @@
 ##### Jared Rice Sr., Neo Thawreww, Shikhar Srivastava and Vinay Gupta
 
 #### Versions
-##### Version 1.0 - October 7th, 2018
-##### Version 2.0 - August 26th, 2019
-##### Version 3.0 - December 10th, 2020
-##### Version 4.0 - February 8th, 2022
-##### Version 5.0 - November 7th, 2022
+- **v1.0** - October 7th, 2018
+- **v2.0** - August 26th, 2019
+- **v3.0** - December 10th, 2020
+- **v4.0** - February 8th, 2022
+- **v5.0** - November 7th, 2022
 
 ## Manifesto
 
