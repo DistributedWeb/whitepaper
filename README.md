@@ -1242,9 +1242,56 @@ As will be seen in the final sections of this paper, dMachines can be used to bu
 ## dDNS 
 In order to create a truly distributed and decentralized web, the dWeb cannot be dependent upon centralized domain names and the Internet's tree-structured name space and is not compatible with the Internet's "Domain Name System" (as defined in RFC 1034 and 1035). The dWeb needed its own domain name system that was compatible with dWeb-compliant network addresses. The dWeb would be pretty hard to use without domain names or a directory-like service for dWeb network addresses, considering that 32-byte addresses are difficult to remember. A Domain Name System is a directory lookup service that provides mapping between the names of a host on the Internet and a numerical address or a canonical name. DNS is essential to the functioning of the Internet. 
 
-dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning the registration of Decentralized Top-Level Domains (dTLDs) and the registration of dTLD-based domain names are distributed and decentralized, where records are distributed across the computers of peers on the network related to a given dDNS registry. Like DNS, dDNS is a directory lookup service and provides a mapping between the name of a dDrive, device or peer and a dWeb-based network address. dDNS is essential to the functioning of the dWeb. A dDNS registry is a network of peers that share data regarding dTLDs, registered domains and their associated domain name records. Unlike traditional DNS, dWeb's dDNS does not utilize nameservers since the dWeb is completely serverless. DNS records are stored in distributed databases, whether they be a dDatabase, a dMachine's indexLog or a DHT (if a domain registry is built around an [app-specific DHT](#app-specific-dhts)). Data related toa dDNS registry are resolved using resolvers that simply query the distributed database. We have created a reference implementation known as the [Brane Resolver](#brane-resolver) which showcases how domains can be resolved. The dWeb's dDNS model is depicted in Figure BN-2.
+dWeb's Domain Name System is a Decentralized Domain Name System (dDNS), meaning the registration of Decentralized Top-Level Domains (dTLDs) and the registration of dTLD-based domain names are distributed and decentralized, where records are distributed across the computers of peers on the network related to a given dDNS registry. Like DNS, dDNS is a directory lookup service and provides a mapping between the name of a dDrive, device or peer and a dWeb-based network address. dDNS is essential to the functioning of the dWeb. A dDNS registry is a network of peers that share data regarding dTLDs, registered domains and their associated domain name records. Unlike traditional DNS, dWeb's dDNS does not utilize nameservers since the dWeb is completely serverless. DNS records are stored in distributed databases, whether they be a dDatabase, a dMachine's indexLog or a DHT (if a domain registry is built around an [app-specific DHT](#app-specific-dhts)). Data related toa dDNS registry are resolved using resolvers that simply query the distributed database. We have created a reference implementation known as the [Brane Resolver](#brane-resolver-implementation) which showcases how domains can be resolved. The dWeb's dDNS model is depicted in Figure BN-2.
+
+### Decentralized Top-Level Internet Domains (dTLDs)
+
+dWeb's dDNS registries can issue their own dTLDs (Decentralized Top-Level Domains) that can be registered by users. dTLDs can include anything from text and numbers to emojis and other UniCode-compliant syntax. This specification does not specify whether dDNS registries should have an economic model or the method for which dTLDs are acquired (i.e. auction).
+
+#### 
+
+### Decentralized Domains
 
 
+### Resource Records 
+
+#### Resource Record Types
+
+A dWeb-compliant dDNS utilizes several “Resource Record” types for different types of network entities, including the following:
+
+| Record Type | Description |
+| :--- | :--- |
+| BD | dDrive record for identifying a dDrive resource. |
+| DX | Device address. |
+| RM | Registrar machine address. |
+| U | Record for identifying any UniChain-based structure. |
+| SC | Record for identifying a dMachine |
+| BT | Record for identifying a dDatabase |
+| MM | Record for identifying a Mail Machine. |
+| TXT | Way of putting text comments in the DNS database for a domain. |
+| TW | Record for identifying a tower. |
+| CNAME | Canonical name. Specifies an alias for a BD record. |
+| SRV | Service record for identifying a service. |
+| PX | Peer address. |
+
+For more information on BitNames, read the documentation located [here](https://dw3b.network/bitnames). To read more about the dWeb's Decentralized Domain Name System (dDNS) specification, please read BRC-2 located [here](https://docs.dw3b.network/brcs/2).
+
+#### Resource Record Data Structure
+
+
+### Resolving Records
+1. A User Program queries “domain.x” and a record type.
+2. The Brane Resolver queries the Brane dDatabase for “.x” which returns the public key of BitName’s Index Log.
+3. The Brane Resolver then queries the BitName dDatabase using the UML -`bit://bitnames.x/domain.x/root/BD`, which returns the `root` BD record for `domain.x`. Root Records are considered `wildcard records` on the dWeb. The returned record has the following envelope:
+
+```
+{
+    domain: “domain.x”,
+    address: “<key>”
+}
+```
+
+#### Brane Resolver Implementation
 
 ## dIdentity
 **Under Development**
