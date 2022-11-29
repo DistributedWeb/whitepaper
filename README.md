@@ -1,4 +1,4 @@
-#### NOTE: This document is currently under heavy development and is currently in an incomplete state.
+#### NOTE: This document is currently under heavy development and is currently in an incomplete state as we finalize the fifth revision.
 
 ## The Distributed Web (dWeb)
 
