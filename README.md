@@ -29,7 +29,7 @@
 
 ## Manifesto
 
-**By:** Neo Thawreww 
+**By:** Jared Rice Sr.
 
 Decades ago, we set out to preserve your freedoms on the Internet. Over the years, we have fought tyrannical governments, institutions, corporations, and politicians who have continued to do everything they can to erode those freedoms and attack the many of us who continue to innovate ways to bypass their constant attacks. Somewhere, there is someone who is reading this, tasked with figuring out a way to destroy the things that we are building, not because a crime has been committed, but because we’re doing the unthinkable – we’re standing up to the cabal and continuing to find ways to thwart the authoritarian machine on your behalf. We’re the only army standing between you and them. The good news is, the Web that we're referencing in this paper and its infrastructure, has already been online for over 20 years. We're not launching a network, we're not launching a coin, nor does the dWeb represent software specifically. We view the terms "dWeb," "Distributed Web" and "Decentralized Web" as a reference to what this specification sets out to define: an ecosystem of components that allow for the development of truly end-to-end decentralized and blockchain-less systems.
 
@@ -51,7 +51,7 @@ While we only make up a small army of cryptographers, when the world adopts our 
 
 Onward.
 
-Neo Thawreww 
+Jared Rice Sr.
 
 7 November 2022
 
